@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+# Ensure all Go files are formatted.
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then
+    echo "error: the following files need formatting (run: gofmt -w .):"
+    printf '%s\n' "$unformatted"
+    exit 1
+fi
+
+# Static analysis.
+go vet ./...

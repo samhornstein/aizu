@@ -1,0 +1,7 @@
+bin/
+dist/
+.env
+*.db
+docs/public/
+docs/resources/
+docs/.hugo_build.lock

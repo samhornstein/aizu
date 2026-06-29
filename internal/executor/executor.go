@@ -1,0 +1,26 @@
+// Package executor runs an agent against a repository inside an isolated Docker
+// container: clone, check out the PR branch (if any), run the engine, tear down.
+package executor
+
+import "github.com/samhornstein/aizu/internal/config"
+
+// Executor creates a sandbox, runs the agent engine in it, and destroys it.
+type Executor interface {
+	// Create clones repo (and checks out branch, if non-empty) into a fresh
+	// container, returning a sandbox id.
+	Create(repo, branch string) (sid string, err error)
+	// RunEngine runs the configured engine command with the given prompt,
+	// returning its exit code and combined output.
+	RunEngine(sid, prompt string) (exitCode int, output string, err error)
+	// ReadFile returns the contents of a path inside the sandbox.
+	ReadFile(sid, path string) (string, error)
+	// Destroy removes the sandbox.
+	Destroy(sid string)
+	// CleanupStale removes leftover Aizu containers from previous runs.
+	CleanupStale()
+}
+
+// New returns the default (Docker container) executor.
+func New(cfg *config.Config) Executor {
+	return &containerExecutor{cfg: cfg}
+}

@@ -1,0 +1,14 @@
+baseURL = "https://samhornstein.github.io/aizu/"
+languageCode = "en-us"
+title = "Aizu Docs"
+theme = "hugo-book"
+
+[params]
+  BookTheme = "auto"
+  BookRepo = "https://github.com/samhornstein/aizu"
+  BookSearch = true
+  BookEditPath = "edit/main/docs"
+
+[markup]
+  [markup.highlight]
+    noClasses = false

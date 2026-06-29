@@ -1,0 +1,31 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - aizu-net
+
+  aizu:
+    image: ghcr.io/samhornstein/aizu:latest
+    build: .
+    restart: unless-stopped
+    # The worker launches agent sandboxes via the host Docker daemon.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - aizu-net
+
+volumes:
+  redis-data:
+
+networks:
+  aizu-net:
+    driver: bridge

@@ -9,5 +9,9 @@ if [ -n "$unformatted" ]; then
     exit 1
 fi
 
-# Static analysis.
-go vet ./...
+# Lint (mirrors the CI lint step).
+if ! command -v golangci-lint > /dev/null 2>&1; then
+    echo "error: golangci-lint not found (install: https://golangci-lint.run/welcome/install/)"
+    exit 1
+fi
+golangci-lint run

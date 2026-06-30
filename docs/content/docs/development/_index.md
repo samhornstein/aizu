@@ -11,6 +11,7 @@ bookToc: false
 
 - [Go](https://golang.org/dl/) (see `go.mod` for the required version)
 - [Docker](https://docs.docker.com/get-docker/)
+- [golangci-lint](https://golangci-lint.run/welcome/install/) — required by the pre-commit hook
 
 ## Setup
 

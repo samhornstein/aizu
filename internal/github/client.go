@@ -161,7 +161,7 @@ func (c *Client) getPaged(ctx context.Context, url string, out any) (string, err
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if err := decode(resp, out); err != nil {
 		return "", err
 	}
@@ -182,7 +182,7 @@ func (c *Client) post(ctx context.Context, url string, body, out any) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return decode(resp, out)
 }
 

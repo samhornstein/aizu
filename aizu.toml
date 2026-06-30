@@ -2,7 +2,7 @@
 redis_url = "redis://localhost:6379"
 
 [trigger]
-keyword = "@aizu"
+keyword = "aizu"
 repos = []   # required: e.g. ["owner/repo1", "owner/repo2"]
 users = []   # optional: restrict to these GitHub logins; empty = allow all
 
@@ -12,5 +12,4 @@ command = "pi -p \"$(cat {prompt_file})\""
 timeout = 600
 
 [poller]
-interval_seconds = 30
-
+interval_seconds = 15

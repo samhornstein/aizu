@@ -42,7 +42,6 @@ func envExports(cfg *config.Config) string {
 	for key, val := range map[string]string{
 		"ANTHROPIC_API_KEY": cfg.AnthropicKey,
 		"OPENAI_API_KEY":    cfg.OpenAIKey,
-		"MODEL_SERVER_HOST": cfg.ModelServerHost,
 	} {
 		if val != "" {
 			exports = append(exports, fmt.Sprintf("export %s=%s", key, shellQuote(val)))

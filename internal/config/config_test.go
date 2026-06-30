@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-
 func TestEnvOverrides(t *testing.T) {
 	t.Setenv("AIZU_TRIGGER", "@bot")
 	t.Setenv("AIZU_REPOS", "owner/repo1, owner/repo2")

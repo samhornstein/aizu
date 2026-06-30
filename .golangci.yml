@@ -10,9 +10,8 @@ linters:
   settings:
     errcheck:
       check-type-assertions: true
-
-exclusions:
-  rules:
-    - path: "_test\\.go"
-      linters:
-        - errcheck
+  exclusions:
+    rules:
+      - path: "_test\\.go"
+        linters:
+          - errcheck

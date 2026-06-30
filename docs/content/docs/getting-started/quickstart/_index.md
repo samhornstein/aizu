@@ -78,4 +78,36 @@ From your **personal** account, comment on any issue in a watched repo:
 @aizu hello
 ```
 
-Within one polling interval (30 seconds by default) Aizu reacts with 👀, runs the agent, and posts the result as a reply.
+Within one polling interval (15 seconds by default) Aizu reacts with 👀, runs the agent, and posts the result as a reply.
+
+> **Note:** With a small local model the reply may be incoherent or raw JSON — that's expected. The goal here is just to confirm the pipeline works end-to-end. For real tasks, use a larger model or an API key.
+
+## Troubleshooting
+
+**Follow live logs:**
+```bash
+docker compose logs -f aizu
+```
+
+**Rebuild and restart after config or code changes:**
+```bash
+docker compose up -d --build
+```
+
+**Restart without rebuilding** (e.g. after editing `aizu.toml` or `.env`):
+```bash
+docker compose restart aizu
+```
+
+**Aizu isn't picking up `@aizu` comments:**
+- Make sure the comment is from your *personal* account, not the bot account — Aizu ignores its own token's account.
+- Check that `repos` in `aizu.toml` matches the repo exactly (`owner/repo`).
+- The poller runs every 15 seconds; wait one interval then check the logs.
+
+**Agent fails with "no models returned" or connection error:**
+- Make sure `llama-server` is still running (`curl http://localhost:8080/v1/models`).
+- On Linux, replace `host.docker.internal` in `OPENAI_BASE_URL` with your host IP (e.g. `172.17.0.1`).
+
+**Container exits immediately:**
+- Run `docker compose logs aizu` (without `-f`) to see the error before it restarts.
+- `no repos configured` means `repos` in `aizu.toml` is empty or the file failed to parse — check for missing quotes around repo names.

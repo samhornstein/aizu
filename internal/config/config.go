@@ -68,7 +68,7 @@ func Load() *Config {
 		ContainerImage: "ghcr.io/samhornstein/aizu-agent:pi",
 		EngineCommand:  `pi -p "$(cat {prompt_file})"`,
 		Timeout:        600,
-		PollInterval:   30 * time.Second,
+		PollInterval:   15 * time.Second,
 	}
 
 	// 2. aizu.toml, if present in the working directory (override AIZU_CONFIG).

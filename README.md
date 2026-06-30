@@ -21,11 +21,19 @@ Add your `GITHUB_TOKEN` to `.env` and set your repos in `aizu.toml`:
 repos = ["owner/repo"]
 ```
 
+Start a local model server (downloads ~1 GB on first run; requires [llama.cpp](https://github.com/ggml-org/llama.cpp#quick-start)):
+
+```bash
+llama-server -hf bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M --port 8080
+```
+
+Uncomment `MODEL_SERVER_HOST=host.docker.internal:8080` in `.env`, then:
+
 ```bash
 docker compose up -d
 ```
 
-Then comment `@aizu …` on an issue or PR in a watched repo.
+Comment `@aizu hello` on an issue in a watched repo — you should see a 👀 reaction and a reply within 30 seconds.
 
 ## Docs
 

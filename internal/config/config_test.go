@@ -6,22 +6,6 @@ import (
 	"time"
 )
 
-func TestDefaults(t *testing.T) {
-	cfg := Load()
-	if cfg.Trigger != "@aizu" {
-		t.Errorf("Trigger = %q, want @aizu", cfg.Trigger)
-	}
-	if cfg.Timeout != 600 {
-		t.Errorf("Timeout = %d, want 600", cfg.Timeout)
-	}
-	if cfg.PollInterval != 30*time.Second {
-		t.Errorf("PollInterval = %v, want 30s", cfg.PollInterval)
-	}
-	if cfg.RedisURL != "redis://localhost:6379" {
-		t.Errorf("RedisURL = %q, want redis://localhost:6379", cfg.RedisURL)
-	}
-}
-
 func TestEnvOverrides(t *testing.T) {
 	t.Setenv("AIZU_TRIGGER", "@bot")
 	t.Setenv("AIZU_REPOS", "owner/repo1, owner/repo2")

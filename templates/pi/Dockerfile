@@ -11,5 +11,3 @@ RUN apt-get update \
 RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
 WORKDIR /workspace
-
-ENTRYPOINT ["pi"]

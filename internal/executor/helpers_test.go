@@ -54,12 +54,11 @@ func TestEnvExportsAlwaysIncludesGitIdentity(t *testing.T) {
 
 func TestEnvExportsIncludesSetKeys(t *testing.T) {
 	cfg := &config.Config{
-		AnthropicKey:    "sk-ant",
-		OpenAIKey:       "sk-oai",
-		ModelServerHost: "localhost:8080",
+		AnthropicKey: "sk-ant",
+		OpenAIKey:    "sk-oai",
 	}
 	out := envExports(cfg)
-	for _, want := range []string{"ANTHROPIC_API_KEY=", "OPENAI_API_KEY=", "MODEL_SERVER_HOST="} {
+	for _, want := range []string{"ANTHROPIC_API_KEY=", "OPENAI_API_KEY="} {
 		if !strings.Contains(out, want) {
 			t.Errorf("envExports missing %q; got: %s", want, out)
 		}

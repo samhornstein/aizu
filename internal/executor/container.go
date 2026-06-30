@@ -2,8 +2,11 @@ package executor
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"os/exec"
 	"strings"
 	"time"
@@ -41,8 +44,78 @@ func (e *containerExecutor) Create(repo, branch string) (string, error) {
 		}
 	}
 
+	if err := e.writeModelsJSON(sid); err != nil {
+		return "", fmt.Errorf("write models.json: %w", err)
+	}
+
 	slog.Info("Created container", "sid", sid, "repo", repo, "branch", branch)
 	return sid, nil
+}
+
+func (e *containerExecutor) writeModelsJSON(sid string) error {
+	if e.cfg.OpenAIBaseURL == "" {
+		return nil
+	}
+	modelID, err := discoverModelID(e.cfg.OpenAIBaseURL)
+	if err != nil {
+		return fmt.Errorf("discover model: %w", err)
+	}
+	type modelEntry struct {
+		ID string `json:"id"`
+	}
+	type compat struct {
+		SupportsDeveloperRole   bool `json:"supportsDeveloperRole"`
+		SupportsReasoningEffort bool `json:"supportsReasoningEffort"`
+	}
+	type provider struct {
+		BaseURL string       `json:"baseUrl"`
+		API     string       `json:"api"`
+		APIKey  string       `json:"apiKey"`
+		Compat  compat       `json:"compat"`
+		Models  []modelEntry `json:"models"`
+	}
+	payload := map[string]interface{}{
+		"providers": map[string]provider{
+			"local": {
+				BaseURL: e.cfg.OpenAIBaseURL,
+				API:     "openai-completions",
+				APIKey:  "local",
+				Compat:  compat{SupportsDeveloperRole: false, SupportsReasoningEffort: false},
+				Models:  []modelEntry{{ID: modelID}},
+			},
+		},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	encoded := base64.StdEncoding.EncodeToString(data)
+	_, err = e.exec(sid, fmt.Sprintf("mkdir -p /root/.pi/agent && echo %s | base64 -d > /root/.pi/agent/models.json", shellQuote(encoded)), 0)
+	return err
+}
+
+func discoverModelID(baseURL string) (string, error) {
+	resp, err := http.Get(strings.TrimRight(baseURL, "/") + "/models")
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	var result struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", err
+	}
+	if len(result.Data) == 0 {
+		return "", fmt.Errorf("no models returned by %s/models", baseURL)
+	}
+	return result.Data[0].ID, nil
 }
 
 func (e *containerExecutor) RunEngine(sid, prompt string) (int, string, error) {
@@ -52,6 +125,11 @@ func (e *containerExecutor) RunEngine(sid, prompt string) (int, string, error) {
 	}
 
 	command := strings.Replace(e.cfg.EngineCommand, "{prompt_file}", promptFile, 1)
+	if e.cfg.OpenAIBaseURL != "" {
+		if modelID, err := discoverModelID(e.cfg.OpenAIBaseURL); err == nil {
+			command = strings.Replace(command, "pi ", "pi --model "+shellQuote(modelID)+" ", 1)
+		}
+	}
 	full := fmt.Sprintf("cd /workspace/repo && %s", command)
 	if prefix := envExports(e.cfg); prefix != "" {
 		full = prefix + " && " + full

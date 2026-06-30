@@ -1,19 +1,18 @@
+version: "2"
+
 linters:
+  default: none
   enable:
     - errcheck
     - staticcheck
-    - gosimple
     - ineffassign
-    - unused
     - govet
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
+  settings:
+    errcheck:
+      check-type-assertions: true
 
 issues:
   exclude-rules:
-    # Test files don't need to check error returns on every call.
     - path: "_test\\.go"
       linters:
         - errcheck

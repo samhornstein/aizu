@@ -99,8 +99,9 @@ docker compose up -d --build
 docker compose restart aizu
 ```
 
-**Aizu isn't picking up `@aizu` comments:**
+**Aizu isn't picking up comments:**
 - Make sure the comment is from your *personal* account, not the bot account — Aizu ignores its own token's account.
+- Check that your message begins with the `keyword` in `aizu.toml`.
 - Check that `repos` in `aizu.toml` matches the repo exactly (`owner/repo`).
 - The poller runs every 15 seconds; wait one interval then check the logs.
 

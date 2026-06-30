@@ -14,5 +14,3 @@ timeout = 600
 [poller]
 interval_seconds = 30
 
-[models]
-model_server_host = ""

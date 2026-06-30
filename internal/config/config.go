@@ -34,9 +34,9 @@ type Config struct {
 	PollInterval time.Duration
 
 	// Model credentials passed through to the agent container
-	AnthropicKey    string
-	OpenAIKey       string
-	ModelServerHost string
+	AnthropicKey  string
+	OpenAIKey     string
+	OpenAIBaseURL string
 }
 
 type tomlConfig struct {
@@ -53,9 +53,6 @@ type tomlConfig struct {
 		Command string `toml:"command"`
 		Timeout int    `toml:"timeout"`
 	} `toml:"agent"`
-	Models struct {
-		ModelServerHost string `toml:"model_server_host"`
-	} `toml:"models"`
 	Poller struct {
 		IntervalSeconds int `toml:"interval_seconds"`
 	} `toml:"poller"`
@@ -102,9 +99,6 @@ func Load() *Config {
 		if tc.Agent.Timeout != 0 {
 			cfg.Timeout = tc.Agent.Timeout
 		}
-		if tc.Models.ModelServerHost != "" {
-			cfg.ModelServerHost = tc.Models.ModelServerHost
-		}
 		if tc.Poller.IntervalSeconds > 0 {
 			cfg.PollInterval = time.Duration(tc.Poller.IntervalSeconds) * time.Second
 		}
@@ -140,8 +134,8 @@ func Load() *Config {
 	cfg.GitHubToken = os.Getenv("GITHUB_TOKEN")
 	cfg.AnthropicKey = os.Getenv("ANTHROPIC_API_KEY")
 	cfg.OpenAIKey = os.Getenv("OPENAI_API_KEY")
-	if v := os.Getenv("MODEL_SERVER_HOST"); v != "" {
-		cfg.ModelServerHost = v
+	if v := os.Getenv("OPENAI_BASE_URL"); v != "" {
+		cfg.OpenAIBaseURL = v
 	}
 
 	return cfg

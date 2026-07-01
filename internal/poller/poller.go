@@ -79,8 +79,15 @@ func (p *Poller) pollRepo(ctx context.Context, repo string) error {
 			slog.Warn("Could not parse issue number", "repo", repo, "issue_url", c.IssueURL)
 			continue
 		}
-		if _, err := p.q.Enqueue(ctx, repo, number, c.ID, c.Body, c.User.Login); err != nil {
+		task, err := p.q.Enqueue(ctx, repo, number, c.ID, c.Body, c.User.Login)
+		if err != nil {
 			slog.Error("Enqueue failed", "repo", repo, "number", number, "error", err)
+			continue
+		}
+		if task != nil {
+			if err := p.gh.AddReaction(ctx, repo, c.ID, "eyes"); err != nil {
+				slog.Warn("Could not add queued reaction", "repo", repo, "commentID", c.ID, "error", err)
+			}
 		}
 	}
 

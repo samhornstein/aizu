@@ -51,7 +51,7 @@ func (w *Worker) process(ctx context.Context, task *queue.Task) {
 	log := slog.With("id", task.ID, "repo", task.Repo, "number", task.Number)
 	log.Info("Processing task")
 
-	if err := w.gh.AddReaction(ctx, task.Repo, task.CommentID, "eyes"); err != nil {
+	if err := w.gh.AddReaction(ctx, task.Repo, task.CommentID, "rocket"); err != nil {
 		log.Warn("Could not add reaction", "error", err)
 	}
 

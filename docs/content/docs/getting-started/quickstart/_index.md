@@ -20,7 +20,7 @@ Create a new account at [github.com/join](https://github.com/join) using `yourna
 
 Then from the bot account, generate a [classic token](https://github.com/settings/tokens) with the `repo` scope (fine-grained tokens can't access repos the account doesn't own).
 
-> **Private repos:** Add the bot account as a collaborator first: **Settings → Collaborators → Add people**.
+> **Private repos:** Add the bot account as a collaborator first: **Settings → Collaborators → Add people**. Then log in as the bot account and accept the collaboration invite — the token won't have access until the invite is accepted.
 
 ## 2. Clone and configure
 

@@ -65,6 +65,9 @@ type Issue struct {
 	Title       string `json:"title"`
 	Body        string `json:"body"`
 	State       string `json:"state"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	User        User     `json:"user"`
 	PullRequest *struct {
 		URL string `json:"url"`
 	} `json:"pull_request"`
@@ -141,6 +144,30 @@ func (c *Client) AddReaction(ctx context.Context, repoFull string, commentID int
 func (c *Client) CreateComment(ctx context.Context, repoFull string, number int, body string) error {
 	u := fmt.Sprintf("%s/repos/%s/issues/%d/comments", apiBase, repoFull, number)
 	return c.post(ctx, u, map[string]string{"body": body}, nil)
+}
+
+// ListIssues returns issues (including PRs) across the repo updated at or
+// after since, oldest first, following pagination. Only open issues are returned.
+func (c *Client) ListIssues(ctx context.Context, repoFull string, since time.Time) ([]Issue, error) {
+	q := url.Values{}
+	q.Set("since", since.UTC().Format(time.RFC3339))
+	q.Set("state", "all")
+	q.Set("sort", "updated")
+	q.Set("direction", "asc")
+	q.Set("per_page", "100")
+	next := fmt.Sprintf("%s/repos/%s/issues?%s", apiBase, repoFull, q.Encode())
+
+	var all []Issue
+	for next != "" {
+		var page []Issue
+		link, err := c.getPaged(ctx, next, &page)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, page...)
+		next = link
+	}
+	return all, nil
 }
 
 // --- low-level helpers ---

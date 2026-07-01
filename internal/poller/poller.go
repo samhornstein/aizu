@@ -1,9 +1,8 @@
 // Package poller periodically polls GitHub for new issue/PR comments and
 // enqueues a task for each comment that mentions the trigger keyword.
+// It also polls for issues with the trigger keyword in their body.
 //
-// It polls exactly one endpoint per repo —
-// GET /repos/{owner}/{repo}/issues/comments?since={t} — which returns both issue
-// and pull-request conversation comments. Per-repo "since" state lives in Redis.
+// Per-repo "since" state lives in Redis.
 package poller
 
 import (
@@ -19,6 +18,7 @@ import (
 )
 
 const sincePrefix = "aizu:since:"
+const issuesSincePrefix = "aizu:issuesSince:"
 
 // Poller polls GitHub and enqueues triggered comments.
 type Poller struct {
@@ -85,7 +85,69 @@ func (p *Poller) pollRepo(ctx context.Context, repo string) error {
 	}
 
 	p.saveSince(ctx, repo, pollStart)
+
+	// Also poll for issues with the trigger keyword in the body.
+	if err := p.pollIssues(ctx, repo); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// pollIssues checks for issues (including PRs) that have the trigger keyword
+// in their body and enqueues them.
+func (p *Poller) pollIssues(ctx context.Context, repo string) error {
+	issuesSince := p.lastIssuesSince(ctx, repo)
+
+	issues, err := p.gh.ListIssues(ctx, repo, issuesSince)
+	if err != nil {
+		return err
+	}
+
+	for _, issue := range issues {
+		if p.cfg.BotUsername != "" && issue.User.Login == p.cfg.BotUsername {
+			continue // never react to issues created by our own account
+		}
+		if !strings.Contains(issue.Body, p.cfg.Trigger) {
+			continue
+		}
+		if len(p.cfg.Users) > 0 && !contains(p.cfg.Users, issue.User.Login) {
+			slog.Info("Ignoring issue from non-allowlisted user", "repo", repo, "user", issue.User.Login)
+			continue
+		}
+		// Enqueue with CommentID=0 to signal this was triggered by the issue body.
+		if _, err := p.q.Enqueue(ctx, repo, issue.Number, 0, p.cfg.Trigger, issue.User.Login); err != nil {
+			slog.Error("Enqueue failed (issue body)", "repo", repo, "number", issue.Number, "error", err)
+		}
+	}
+
+	if len(issues) > 0 {
+		// Advance cursor to the latest issue's updated time so we don't
+		// re-process issues already seen.
+		latest := issues[len(issues)-1].UpdatedAt
+		p.saveIssuesSince(ctx, repo, latest)
+	}
+
+	return nil
+}
+
+func (p *Poller) lastIssuesSince(ctx context.Context, repo string) time.Time {
+	v, err := p.rdb.Get(ctx, issuesSincePrefix+repo).Result()
+	if err != nil {
+		// First run for this repo: only consider issues from now on.
+		return time.Now()
+	}
+	t, err := time.Parse(time.RFC3339, v)
+	if err != nil {
+		return time.Now()
+	}
+	return t
+}
+
+func (p *Poller) saveIssuesSince(ctx context.Context, repo string, t time.Time) {
+	if err := p.rdb.Set(ctx, issuesSincePrefix+repo, t.UTC().Format(time.RFC3339), 0).Err(); err != nil {
+		slog.Warn("Could not persist issues poll cursor", "repo", repo, "error", err)
+	}
 }
 
 // shouldTrigger applies the self/author/keyword filters.

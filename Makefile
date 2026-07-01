@@ -1,4 +1,4 @@
-.PHONY: build run vet fmt mod-tidy test clean build-agent up down docs-serve docs-build install-hooks
+.PHONY: build run vet fmt mod-tidy test test-integration clean build-agent up down docs-serve docs-build install-hooks
 
 build: vet
 	go build -o bin/aizu .
@@ -14,6 +14,9 @@ mod-tidy:
 
 test:
 	go test ./...
+
+test-integration:
+	go test -race -count=1 ./internal/queue/... ./internal/executor/... ./internal/e2e/...
 
 run: build
 	./bin/aizu

@@ -15,3 +15,9 @@ if ! command -v golangci-lint > /dev/null 2>&1; then
     exit 1
 fi
 golangci-lint run
+
+# Run unit tests (skips integration tests that need Redis/Docker).
+# Set SKIP_PRE_COMMIT_TESTS=1 to bypass.
+if [ -z "$SKIP_PRE_COMMIT_TESTS" ]; then
+    go test ./...
+fi

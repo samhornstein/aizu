@@ -51,8 +51,12 @@ func (w *Worker) process(ctx context.Context, task *queue.Task) {
 	log := slog.With("id", task.ID, "repo", task.Repo, "number", task.Number)
 	log.Info("Processing task")
 
-	if err := w.gh.AddReaction(ctx, task.Repo, task.CommentID, "eyes"); err != nil {
-		log.Warn("Could not add reaction", "error", err)
+	// Only react to the comment if this was triggered by a comment.
+	// Issue-body triggers have CommentID=0.
+	if task.CommentID > 0 {
+		if err := w.gh.AddReaction(ctx, task.Repo, task.CommentID, "eyes"); err != nil {
+			log.Warn("Could not add reaction", "error", err)
+		}
 	}
 
 	output, err := w.handle(ctx, task, log)
@@ -112,12 +116,22 @@ func (w *Worker) buildPrompt(sid string, issue *github.Issue, task *queue.Task) 
 	var b strings.Builder
 	b.WriteString(w.loader.Resolve(w.exec, sid))
 	b.WriteString("\n\n---\n\n")
-	fmt.Fprintf(&b, "You are responding to a comment on %s #%d (a %s) in %s.\n\n", kind, issue.Number, kind, task.Repo)
-	fmt.Fprintf(&b, "Title: %s\n", issue.Title)
-	if body := strings.TrimSpace(issue.Body); body != "" {
-		fmt.Fprintf(&b, "Description:\n%s\n", truncate(body, 4000))
+
+	if task.CommentID > 0 {
+		// Triggered by a comment.
+		fmt.Fprintf(&b, "You are responding to a comment on %s #%d (a %s) in %s.\n\n", kind, issue.Number, kind, task.Repo)
+		fmt.Fprintf(&b, "Title: %s\n", issue.Title)
+		if body := strings.TrimSpace(issue.Body); body != "" {
+			fmt.Fprintf(&b, "Description:\n%s\n", truncate(body, 4000))
+		}
+		fmt.Fprintf(&b, "\nThe comment from @%s that triggered you:\n%s\n", task.Author, task.Body)
+	} else {
+		// Triggered by the issue body itself.
+		fmt.Fprintf(&b, "You are responding to %s #%d (a %s) in %s.\n\n", kind, issue.Number, kind, task.Repo)
+		fmt.Fprintf(&b, "Title: %s\n", issue.Title)
+		fmt.Fprintf(&b, "The request from @%s in the %s body:\n", task.Author, kind)
+		fmt.Fprintf(&b, "%s\n", truncate(strings.TrimSpace(issue.Body), 4000))
 	}
-	fmt.Fprintf(&b, "\nThe comment from @%s that triggered you:\n%s\n", task.Author, task.Body)
 	return b.String()
 }
 

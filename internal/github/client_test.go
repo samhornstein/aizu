@@ -178,3 +178,32 @@ func TestIssueIsPR(t *testing.T) {
 		t.Error("Issue with PullRequest set should be a PR")
 	}
 }
+
+func TestListIssues(t *testing.T) {
+	since := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	issues := []Issue{
+		{Number: 42, Title: "Fix bug", Body: "@aizu please fix this", State: "open", User: User{Login: "alice"}},
+	}
+	body, _ := json.Marshal(issues)
+
+	c := fakeClient(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path != "/repos/o/r/issues" {
+			t.Errorf("path = %q, want /repos/o/r/issues", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("since"); got == "" {
+			t.Error("missing since query param")
+		}
+		if got := r.URL.Query().Get("state"); got != "all" {
+			t.Errorf("state = %q, want all", got)
+		}
+		return jsonResp(r, 200, string(body)), nil
+	})
+
+	got, err := c.ListIssues(context.Background(), "o/r", since)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Number != 42 {
+		t.Errorf("issues = %+v, want 1 issue with Number=42", got)
+	}
+}

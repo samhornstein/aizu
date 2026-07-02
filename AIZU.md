@@ -13,7 +13,7 @@ to git and the working tree at /workspace/repo.
 
 ## Progress Updates
 
-For any task that involves multiple steps, provide progress updates as follows:
+Provide progress updates as follows:
 
 1. **Create an outline** — Before starting work, create a checklist of the
    steps needed to complete the task.

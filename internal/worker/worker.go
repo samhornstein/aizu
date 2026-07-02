@@ -16,11 +16,19 @@ import (
 	"github.com/samhornstein/aizu/internal/template"
 )
 
+// ghClient is the subset of github.Client the worker depends on.
+type ghClient interface {
+	AddReaction(ctx context.Context, repoFull string, commentID int64, content string) error
+	CreateComment(ctx context.Context, repoFull string, number int, body string) error
+	GetIssue(ctx context.Context, repoFull string, number int) (*github.Issue, error)
+	GetPullRequest(ctx context.Context, repoFull string, number int) (*github.PullRequest, error)
+}
+
 // Worker processes one task at a time from the shared queue.
 type Worker struct {
 	q      *queue.Queue
 	exec   executor.Executor
-	gh     *github.Client
+	gh     ghClient
 	loader *template.Loader
 }
 

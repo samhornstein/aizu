@@ -20,10 +20,15 @@ import (
 
 const sincePrefix = "aizu:since:"
 
+// ghClient is the subset of github.Client the poller depends on.
+type ghClient interface {
+	ListIssueComments(ctx context.Context, repoFull string, since time.Time) ([]github.Comment, error)
+}
+
 // Poller polls GitHub and enqueues triggered comments.
 type Poller struct {
 	cfg *config.Config
-	gh  *github.Client
+	gh  ghClient
 	q   *queue.Queue
 	rdb *redis.Client
 }
@@ -31,6 +36,11 @@ type Poller struct {
 // New constructs a Poller.
 func New(cfg *config.Config, gh *github.Client, q *queue.Queue) *Poller {
 	return &Poller{cfg: cfg, gh: gh, q: q, rdb: q.Client()}
+}
+
+// RunOnceForTest runs a single poll cycle. Exported for integration tests.
+func (p *Poller) RunOnceForTest(ctx context.Context) {
+	p.pollOnce(ctx)
 }
 
 // Run polls on the configured interval until ctx is cancelled.

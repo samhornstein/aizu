@@ -7,6 +7,22 @@ weight: 1
 
 ## Token management
 
+Aizu supports two authentication methods:
+
+### GitHub App (recommended)
+
+GitHub Apps provide better security than PATs:
+
+- **Per-repo installation** — grant access only to specific repos
+- **Scoped permissions** — request only the permissions you need
+- **Automatic token rotation** — Aizu refreshes installation tokens every hour
+  automatically
+- **No long-lived secrets** — installation tokens expire after 1 hour
+
+See [Quickstart](../getting-started/quickstart/) for setup instructions.
+
+### Personal Access Token (PAT)
+
 - **Use a dedicated bot account.** Never run Aizu with your personal GitHub
   token.
 - **Use a classic PAT with only the `repo` scope.** Avoid broader scopes like

@@ -1,7 +1,7 @@
 // Package github is a small REST client for the slice of the GitHub API that
 // Aizu needs: listing issue/PR comments since a timestamp, resolving whether an
-// issue is a pull request, reacting to comments, and posting replies. It
-// authenticates with a personal access token (PAT) only.
+// issue is a pull request, reacting to comments, and posting replies.
+// It supports both PAT and GitHub App authentication.
 package github
 
 import (
@@ -18,16 +18,36 @@ import (
 
 const apiBase = "https://api.github.com"
 
-// Client talks to the GitHub REST API with a fixed bearer token.
-type Client struct {
-	token string
-	http  *http.Client
+// TokenProvider supplies an OAuth installation access token. Implementations
+// may cache and auto-refresh tokens (e.g. GitHub App installation tokens).
+type TokenProvider interface {
+	Token() string
 }
 
-// New returns a Client. An empty token yields unauthenticated requests, which
-// GitHub heavily rate-limits — a PAT is expected in practice.
+// staticToken is a TokenProvider that always returns the same string.
+type staticToken struct {
+	token string
+}
+
+func (s *staticToken) Token() string { return s.token }
+
+// Client talks to the GitHub REST API.
+type Client struct {
+	provider TokenProvider
+	http     *http.Client
+}
+
+// New returns a Client that authenticates with a fixed PAT.
+// An empty token yields unauthenticated requests, which GitHub heavily
+// rate-limits — a PAT or GitHub App is expected in practice.
 func New(token string) *Client {
-	return &Client{token: token, http: &http.Client{Timeout: 15 * time.Second}}
+	return &Client{provider: &staticToken{token: token}, http: &http.Client{Timeout: 15 * time.Second}}
+}
+
+// NewWithProvider returns a Client that uses the given TokenProvider for
+// authentication. This is the entry point for GitHub App authentication.
+func NewWithProvider(provider TokenProvider) *Client {
+	return &Client{provider: provider, http: &http.Client{Timeout: 15 * time.Second}}
 }
 
 // User is the subset of a GitHub user we care about.
@@ -189,8 +209,10 @@ func (c *Client) post(ctx context.Context, url string, body, out any) error {
 func (c *Client) do(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+	if c.provider != nil {
+		if tok := c.provider.Token(); tok != "" {
+			req.Header.Set("Authorization", "Bearer "+tok)
+		}
 	}
 	return c.http.Do(req)
 }

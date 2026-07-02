@@ -12,7 +12,38 @@ Get Aizu running and trigger your first agent.
 - [Docker](https://docs.docker.com/get-docker/)
 - [llama.cpp](https://github.com/ggml-org/llama.cpp#quick-start) — `brew install llama.cpp` on Mac
 
-## 1. Set up a GitHub bot account
+## 1. Set up GitHub authentication
+
+Choose one of the two authentication methods below.
+
+### Option A: GitHub App (recommended)
+
+GitHub Apps provide better security with per-repo installation, scoped permissions, and automatic token rotation.
+
+1. **Create a GitHub App:** Go to **Settings → Developer settings → GitHub Apps → New GitHub App**
+2. **Configure the app:**
+   - **Callback URL:** `https://localhost` (not used, but required)
+   - **Expire user authorization tokens:** Off
+   - **Permissions:**
+     - Repository permissions → **Issues**: Read & write, **Pull requests**: Read & write
+     - Repository permissions → **Contents**: Read-only (needed to check out PR branches)
+   - **Events:** None needed (Aizu polls, no webhooks)
+3. **Generate a private key:** Click **Generate a private key** and download the `.pem` file
+4. **Install the app:** Go to the **Install App** tab and install it on your account/org
+5. **Find the installation ID:** Visit `https://github.com/settings/installations` — the URL contains the ID (e.g., `/settings/installations/12345678`)
+6. **Find the App ID:** On the app's settings page, the **App ID** is displayed at the top
+
+Then in `.env`:
+
+```env
+GITHUB_APP_ID=12345678
+GITHUB_APP_INSTALLATION_ID=87654321
+GITHUB_APP_KEY="-----BEGIN EC PRIVATE KEY-----\nMIGHAgEAM...\n-----END EC PRIVATE KEY-----"
+```
+
+> **Tip:** For the `GITHUB_APP_KEY`, you can also read the PEM file from disk in a wrapper script or use a Docker secrets manager. Multi-line PEM keys in `.env` should be wrapped in quotes with `\n` for newlines.
+
+### Option B: Personal Access Token (PAT)
 
 Aizu needs its own GitHub identity so it can post replies without conflicting with your personal account.
 
@@ -22,6 +53,12 @@ Then from the bot account, generate a [classic token](https://github.com/setting
 
 > **Private repos:** Add the bot account as a collaborator first: **Settings → Collaborators → Add people**. Then log in as the bot account and accept the collaboration invite — the token won't have access until the invite is accepted.
 
+Then in `.env`:
+
+```env
+GITHUB_TOKEN=ghp_YOUR_BOT_TOKEN_HERE
+```
+
 ## 2. Clone and configure
 
 ```bash
@@ -29,11 +66,7 @@ git clone https://github.com/samhornstein/aizu.git && cd aizu
 cp .env.example .env
 ```
 
-Edit `.env` and add the bot account's token:
-
-```env
-GITHUB_TOKEN=ghp_YOUR_BOT_TOKEN_HERE
-```
+Edit `.env` with your chosen authentication method (see above).
 
 Edit `aizu.toml` to set the repositories Aizu should watch (required):
 

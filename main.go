@@ -51,7 +51,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	gh := github.New(cfg.GitHubToken)
+	var gh *github.Client
+	if cfg.GitHubAppID > 0 && cfg.GitHubAppKey != "" && cfg.GitHubAppInstallID > 0 {
+		appAuth, err := github.NewAppAuth(cfg.GitHubAppID, cfg.GitHubAppKey, cfg.GitHubAppInstallID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: GitHub App auth failed: %v\n", err)
+			os.Exit(1)
+		}
+		gh = github.NewWithProvider(appAuth)
+		slog.Info("Using GitHub App authentication", "app_id", cfg.GitHubAppID, "install_id", cfg.GitHubAppInstallID)
+	} else {
+		gh = github.New(cfg.GitHubToken)
+		if cfg.GitHubToken == "" {
+			slog.Warn("No GitHub token configured; API requests will be heavily rate-limited")
+		}
+	}
 	q := queue.New(cfg.RedisURL)
 
 	ctx, cancel := context.WithCancel(context.Background())

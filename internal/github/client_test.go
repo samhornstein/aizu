@@ -47,7 +47,7 @@ type roundTripper func(*http.Request) (*http.Response, error)
 func (f roundTripper) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func fakeClient(fn roundTripper) *Client {
-	return &Client{token: "test-token", http: &http.Client{Transport: fn}}
+	return &Client{provider: &staticToken{token: "test-token"}, http: &http.Client{Transport: fn}}
 }
 
 func jsonResp(r *http.Request, status int, body string) *http.Response {

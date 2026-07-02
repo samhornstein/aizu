@@ -21,9 +21,14 @@ type Config struct {
 	Repos   []string // "owner/repo" list; empty means auto-discover the token owner's repos
 	Users   []string // allowlisted comment authors; empty means allow everyone
 
-	// GitHub
+	// GitHub authentication (PAT or GitHub App — one must be set)
 	GitHubToken string // personal access token (PAT)
 	BotUsername string // authenticated account login; comments from it are ignored (set at startup)
+
+	// GitHub App (alternative to PAT; all three must be set together)
+	GitHubAppID        int64  // numeric GitHub App ID
+	GitHubAppKey       string // PEM-encoded EC private key (ES256)
+	GitHubAppInstallID int64  // installation ID on the target org/repo
 
 	// Agent
 	ContainerImage string // image the agent runs in
@@ -56,6 +61,10 @@ type tomlConfig struct {
 	Poller struct {
 		IntervalSeconds int `toml:"interval_seconds"`
 	} `toml:"poller"`
+	GitHubApp struct {
+		AppID     int64 `toml:"app_id"`
+		InstallID int64 `toml:"install_id"`
+	} `toml:"github_app"`
 }
 
 // Load resolves configuration from defaults, aizu.toml, and the environment.
@@ -132,6 +141,28 @@ func Load() *Config {
 
 	// Secrets are environment-only.
 	cfg.GitHubToken = os.Getenv("GITHUB_TOKEN")
+	cfg.GitHubAppKey = os.Getenv("GITHUB_APP_KEY")
+
+	// GitHub App settings from TOML (app_id and install_id are non-secret).
+	if tc.GitHubApp.AppID > 0 {
+		cfg.GitHubAppID = tc.GitHubApp.AppID
+	}
+	if tc.GitHubApp.InstallID > 0 {
+		cfg.GitHubAppInstallID = tc.GitHubApp.InstallID
+	}
+
+	// GitHub App settings from env (override TOML).
+	if v := os.Getenv("GITHUB_APP_ID"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			cfg.GitHubAppID = n
+		}
+	}
+	if v := os.Getenv("GITHUB_APP_INSTALLATION_ID"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			cfg.GitHubAppInstallID = n
+		}
+	}
+
 	cfg.AnthropicKey = os.Getenv("ANTHROPIC_API_KEY")
 	cfg.OpenAIKey = os.Getenv("OPENAI_API_KEY")
 	if v := os.Getenv("OPENAI_BASE_URL"); v != "" {

@@ -16,15 +16,20 @@ Get Aizu running and trigger your first agent.
 - [Docker](https://docs.docker.com/get-docker/)
 - [llama.cpp](https://github.com/ggml-org/llama.cpp#quick-start) — `brew install llama.cpp` on Mac
 
-### 1. Set up a GitHub bot account
+### 1. Set up GitHub authentication
 
-Aizu needs its own GitHub identity so it can post replies without conflicting with your personal account.
+Choose one of the two authentication methods:
 
-Create a new account at [github.com/join](https://github.com/join) using `yourname+aizu@gmail.com` as the email and `yourname-aizu` as the username — GitHub treats the `+` address as separate but it lands in your existing inbox. GitHub also supports multiple logged-in accounts, so you can switch between them without signing out.
+**Option A: GitHub App (recommended)** — per-repo installation, scoped permissions, automatic token rotation.
 
-Then from the bot account, generate a [classic token](https://github.com/settings/tokens) with the `repo` scope (fine-grained tokens can't access repos the account doesn't own).
+1. Create a GitHub App: **Settings → Developer settings → GitHub Apps → New GitHub App**
+2. Set permissions: Issues (R/W), Pull requests (R/W), Contents (Read-only)
+3. Generate and download a private key (`.pem`)
+4. Install the app on your account/org
+5. Find the installation ID at `https://github.com/settings/installations`
+6. Set in `.env`: `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_APP_KEY`
 
-> **Private repos:** Add the bot account as a collaborator first: **Settings → Collaborators → Add people**. Then log in as the bot account and accept the collaboration invite — the token won't have access until the invite is accepted.
+**Option B: Personal Access Token (PAT)** — use a dedicated bot account with a classic `repo`-scoped token.
 
 ### 2. Clone and configure
 
@@ -33,11 +38,7 @@ git clone https://github.com/samhornstein/aizu.git && cd aizu
 cp .env.example .env
 ```
 
-Edit `.env` and add the bot account's token:
-
-```env
-GITHUB_TOKEN=ghp_YOUR_BOT_TOKEN_HERE
-```
+Edit `.env` with your chosen authentication method.
 
 Edit `aizu.toml` to set the repositories Aizu should watch (required):
 

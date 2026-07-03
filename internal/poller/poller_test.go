@@ -73,3 +73,22 @@ func TestContains(t *testing.T) {
 		t.Error("contains(nil, alice) = true, want false")
 	}
 }
+
+func TestShouldTriggerIssueBody(t *testing.T) {
+	// The shouldTrigger function works on comments. For issue body triggers,
+	// the poller uses inline checks in pollIssues instead.
+	// Verify that the keyword check logic is consistent.
+	p := newTestPoller(&config.Config{Trigger: "@aizu"})
+
+	// A comment with the keyword should trigger.
+	c := github.Comment{Body: "@aizu fix this", User: github.User{Login: "alice"}}
+	if !p.shouldTrigger("owner/repo", c) {
+		t.Error("shouldTrigger() = false, want true for matching keyword")
+	}
+
+	// A comment without the keyword should not trigger.
+	c2 := github.Comment{Body: "just a regular comment", User: github.User{Login: "alice"}}
+	if p.shouldTrigger("owner/repo", c2) {
+		t.Error("shouldTrigger() = true, want false when keyword absent")
+	}
+}

@@ -61,13 +61,13 @@ func (c Comment) IssueNumber() int {
 // Issue is the subset of an issue/PR we care about. PullRequest is non-nil when
 // the issue is actually a pull request.
 type Issue struct {
-	Number      int    `json:"number"`
-	Title       string `json:"title"`
-	Body        string `json:"body"`
-	State       string `json:"state"`
+	Number      int       `json:"number"`
+	Title       string    `json:"title"`
+	Body        string    `json:"body"`
+	State       string    `json:"state"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
-	User        User     `json:"user"`
+	User        User      `json:"user"`
 	PullRequest *struct {
 		URL string `json:"url"`
 	} `json:"pull_request"`

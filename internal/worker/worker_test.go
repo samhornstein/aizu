@@ -63,7 +63,7 @@ func TestBuildPromptContainsContext(t *testing.T) {
 	w := newTestWorker(&mockExecutor{fileErr: errors.New("no file")}, "default system prompt")
 
 	issue := &github.Issue{Number: 42, Title: "Fix the bug", Body: "It crashes on startup."}
-	task := &queue.Task{Author: "alice", Body: "@aizu please fix", Repo: "owner/repo", Number: 42}
+	task := &queue.Task{Author: "alice", Body: "@aizu please fix", Repo: "owner/repo", Number: 42, CommentID: 999}
 
 	prompt := w.buildPrompt("sid-1", issue, task)
 
@@ -86,7 +86,7 @@ func TestBuildPromptUsesRepoInstructions(t *testing.T) {
 	w := newTestWorker(&mockExecutor{fileContent: "repo-specific instructions"}, "default")
 
 	issue := &github.Issue{Number: 1, Title: "T"}
-	task := &queue.Task{Author: "alice", Body: "@aizu", Repo: "owner/repo", Number: 1}
+	task := &queue.Task{Author: "alice", Body: "@aizu", Repo: "owner/repo", Number: 1, CommentID: 1}
 
 	prompt := w.buildPrompt("sid-1", issue, task)
 
@@ -108,7 +108,7 @@ func TestBuildPromptIssueVsPR(t *testing.T) {
 			URL string `json:"url"`
 		}{URL: "x"},
 	}
-	task := &queue.Task{Author: "bob", Body: "@aizu", Repo: "owner/repo", Number: 7}
+	task := &queue.Task{Author: "bob", Body: "@aizu", Repo: "owner/repo", Number: 7, CommentID: 1}
 
 	prompt := w.buildPrompt("sid-1", prIssue, task)
 	if !strings.Contains(prompt, "pull request") {
@@ -120,5 +120,33 @@ func TestBuildPromptIssueVsPR(t *testing.T) {
 	prompt = w.buildPrompt("sid-1", regIssue, task)
 	if !strings.Contains(prompt, "issue") {
 		t.Errorf("buildPrompt for issue should say 'issue'; got: %s", prompt)
+	}
+}
+
+func TestBuildPromptIssueBodyTrigger(t *testing.T) {
+	w := newTestWorker(&mockExecutor{fileErr: errors.New("no file")}, "sys")
+
+	issue := &github.Issue{
+		Number: 25,
+		Title:  "Add feature",
+		Body:   "@aizu implement this feature please",
+	}
+	// CommentID=0 signals an issue-body trigger (no comment).
+	task := &queue.Task{Author: "alice", Body: "@aizu", Repo: "owner/repo", Number: 25, CommentID: 0}
+
+	prompt := w.buildPrompt("sid-1", issue, task)
+
+	// Should reference the issue body as the trigger, not a comment.
+	if strings.Contains(prompt, "responding to a comment") {
+		t.Error("issue-body trigger should not say 'responding to a comment'")
+	}
+	if !strings.Contains(prompt, "responding to issue") {
+		t.Errorf("should say 'responding to issue'; got: %s", prompt)
+	}
+	if !strings.Contains(prompt, "@aizu implement this feature please") {
+		t.Error("should include the issue body as the request")
+	}
+	if !strings.Contains(prompt, "in the issue body") {
+		t.Error("should mention 'in the issue body'")
 	}
 }

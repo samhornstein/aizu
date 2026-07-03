@@ -1,4 +1,4 @@
-.PHONY: build run vet fmt mod-tidy test clean build-agent up down docs-serve docs-build install-hooks
+.PHONY: build run vet fmt mod-tidy test test-e2e clean build-agent up down docs-serve docs-build install-hooks
 
 build: vet
 	go build -o bin/aizu .
@@ -14,6 +14,9 @@ mod-tidy:
 
 test:
 	go test ./...
+
+test-e2e:
+	go test -tags e2e -race -timeout 60s ./e2e/...
 
 run: build
 	./bin/aizu

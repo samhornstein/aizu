@@ -25,3 +25,27 @@ jobs:
 
       - name: Test
         run: go test -race ./...
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: E2E test
+        run: go test -tags e2e -race -timeout 60s ./e2e/...
+        env:
+          REDIS_URL: redis://localhost:6379/1

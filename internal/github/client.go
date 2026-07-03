@@ -20,14 +20,28 @@ const apiBase = "https://api.github.com"
 
 // Client talks to the GitHub REST API with a fixed bearer token.
 type Client struct {
-	token string
-	http  *http.Client
+	token   string
+	http    *http.Client
+	baseURL string // empty = use apiBase; set in tests to redirect to a fake server
+}
+
+func (c *Client) base() string {
+	if c.baseURL != "" {
+		return c.baseURL
+	}
+	return apiBase
 }
 
 // New returns a Client. An empty token yields unauthenticated requests, which
 // GitHub heavily rate-limits — a PAT is expected in practice.
 func New(token string) *Client {
 	return &Client{token: token, http: &http.Client{Timeout: 15 * time.Second}}
+}
+
+// NewWithBaseURL returns a Client that sends all requests to baseURL instead of
+// the production GitHub API. Intended for tests only.
+func NewWithBaseURL(token, baseURL string) *Client {
+	return &Client{token: token, http: &http.Client{Timeout: 15 * time.Second}, baseURL: baseURL}
 }
 
 // User is the subset of a GitHub user we care about.
@@ -85,7 +99,7 @@ type PullRequest struct {
 // comments from this account to avoid reacting to its own replies.
 func (c *Client) AuthenticatedUser(ctx context.Context) (User, error) {
 	var u User
-	err := c.get(ctx, apiBase+"/user", &u)
+	err := c.get(ctx, c.base()+"/user", &u)
 	return u, err
 }
 
@@ -97,7 +111,7 @@ func (c *Client) ListIssueComments(ctx context.Context, repoFull string, since t
 	q.Set("sort", "updated")
 	q.Set("direction", "asc")
 	q.Set("per_page", "100")
-	next := fmt.Sprintf("%s/repos/%s/issues/comments?%s", apiBase, repoFull, q.Encode())
+	next := fmt.Sprintf("%s/repos/%s/issues/comments?%s", c.base(), repoFull, q.Encode())
 
 	var all []Comment
 	for next != "" {
@@ -115,7 +129,7 @@ func (c *Client) ListIssueComments(ctx context.Context, repoFull string, since t
 // GetIssue fetches a single issue/PR.
 func (c *Client) GetIssue(ctx context.Context, repoFull string, number int) (*Issue, error) {
 	var i Issue
-	if err := c.get(ctx, fmt.Sprintf("%s/repos/%s/issues/%d", apiBase, repoFull, number), &i); err != nil {
+	if err := c.get(ctx, fmt.Sprintf("%s/repos/%s/issues/%d", c.base(), repoFull, number), &i); err != nil {
 		return nil, err
 	}
 	return &i, nil
@@ -124,7 +138,7 @@ func (c *Client) GetIssue(ctx context.Context, repoFull string, number int) (*Is
 // GetPullRequest fetches a single pull request (for its head branch).
 func (c *Client) GetPullRequest(ctx context.Context, repoFull string, number int) (*PullRequest, error) {
 	var pr PullRequest
-	if err := c.get(ctx, fmt.Sprintf("%s/repos/%s/pulls/%d", apiBase, repoFull, number), &pr); err != nil {
+	if err := c.get(ctx, fmt.Sprintf("%s/repos/%s/pulls/%d", c.base(), repoFull, number), &pr); err != nil {
 		return nil, err
 	}
 	return &pr, nil
@@ -133,13 +147,13 @@ func (c *Client) GetPullRequest(ctx context.Context, repoFull string, number int
 // AddReaction adds a reaction (e.g. "eyes") to an issue comment.
 func (c *Client) AddReaction(ctx context.Context, repoFull string, commentID int64, content string) error {
 	body := map[string]string{"content": content}
-	u := fmt.Sprintf("%s/repos/%s/issues/comments/%d/reactions", apiBase, repoFull, commentID)
+	u := fmt.Sprintf("%s/repos/%s/issues/comments/%d/reactions", c.base(), repoFull, commentID)
 	return c.post(ctx, u, body, nil)
 }
 
 // CreateComment posts a comment on an issue or PR.
 func (c *Client) CreateComment(ctx context.Context, repoFull string, number int, body string) error {
-	u := fmt.Sprintf("%s/repos/%s/issues/%d/comments", apiBase, repoFull, number)
+	u := fmt.Sprintf("%s/repos/%s/issues/%d/comments", c.base(), repoFull, number)
 	return c.post(ctx, u, map[string]string{"body": body}, nil)
 }
 

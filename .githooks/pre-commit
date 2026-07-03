@@ -15,3 +15,6 @@ if ! command -v golangci-lint > /dev/null 2>&1; then
     exit 1
 fi
 golangci-lint run
+
+# Run unit tests (skip e2e tests which require external services).
+go test ./...

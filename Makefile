@@ -28,7 +28,7 @@ install-hooks:
 	ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
 	ln -sf ../../.githooks/commit-msg .git/hooks/commit-msg
 
-# Build the agent container image referenced by aizu.toml ([agent].image).
+# Build the agent container image referenced by .aizu/config.toml ([agent].image).
 build-agent:
 	docker build -t aizu-agent:pi -f templates/pi/Dockerfile .
 

@@ -92,3 +92,65 @@ func TestEnvIntInvalid(t *testing.T) {
 		t.Error("envInt(non-numeric) should return ok=false")
 	}
 }
+
+func TestDotAizuConfigPrecedence(t *testing.T) {
+	// Create a temp dir with both .aizu/config.toml and aizu.toml
+	// to verify .aizu/config.toml takes precedence.
+	tmp := t.TempDir()
+	t.Chdir(tmp)
+
+	// Create legacy aizu.toml with different values
+	err := os.WriteFile("aizu.toml", []byte(`
+[trigger]
+keyword = "@legacy"
+repos   = ["legacy/repo"]
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create .aizu/config.toml with different values
+	err = os.MkdirAll(".aizu", 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile(".aizu/config.toml", []byte(`
+[trigger]
+keyword = "@dotAizu"
+repos   = ["dotAizu/repo"]
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Load()
+	if cfg.Trigger != "@dotAizu" {
+		t.Errorf("Trigger = %q, want @dotAizu (from .aizu/config.toml)", cfg.Trigger)
+	}
+	if len(cfg.Repos) != 1 || cfg.Repos[0] != "dotAizu/repo" {
+		t.Errorf("Repos = %v, want [dotAizu/repo] (from .aizu/config.toml)", cfg.Repos)
+	}
+}
+
+func TestLegacyFallback(t *testing.T) {
+	// When .aizu/config.toml does not exist, aizu.toml should be used.
+	tmp := t.TempDir()
+	t.Chdir(tmp)
+
+	err := os.WriteFile("aizu.toml", []byte(`
+[trigger]
+keyword = "@fallback"
+repos   = ["fallback/repo"]
+`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Load()
+	if cfg.Trigger != "@fallback" {
+		t.Errorf("Trigger = %q, want @fallback (from legacy aizu.toml)", cfg.Trigger)
+	}
+	if len(cfg.Repos) != 1 || cfg.Repos[0] != "fallback/repo" {
+		t.Errorf("Repos = %v, want [fallback/repo] (from legacy aizu.toml)", cfg.Repos)
+	}
+}

@@ -51,5 +51,5 @@ docker compose up -d --build
 
 ## Backup
 
-Back up `.env` (tokens), `aizu.toml` (config), and Redis data if using
+Back up `.env` (tokens), `.aizu/config.toml` (config), and Redis data if using
 persistence.

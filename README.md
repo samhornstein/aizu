@@ -31,6 +31,7 @@ Then from the bot account, generate a [classic token](https://github.com/setting
 ```bash
 git clone https://github.com/samhornstein/aizu.git && cd aizu
 cp .env.example .env
+mkdir -p .aizu && cp aizu.toml.example .aizu/config.toml
 ```
 
 Edit `.env` and add the bot account's token:
@@ -39,12 +40,14 @@ Edit `.env` and add the bot account's token:
 GITHUB_TOKEN=ghp_YOUR_BOT_TOKEN_HERE
 ```
 
-Edit `aizu.toml` to set the repositories Aizu should watch (required):
+Edit `.aizu/config.toml` to set the repositories Aizu should watch (required):
 
 ```toml
 [trigger]
 repos = ["owner/repo"]
 ```
+
+> The `.aizu/` directory is gitignored so your local config never creates unstaged changes.
 
 ### 3. Start a local model
 

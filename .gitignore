@@ -2,6 +2,7 @@ bin/
 dist/
 .env
 *.db
+.aizu/
 docs/public/
 docs/resources/
 docs/.hugo_build.lock

@@ -1,5 +1,6 @@
 // Package config loads Aizu's configuration from, in increasing order of
-// precedence: built-in defaults, an aizu.toml file, and environment variables.
+// precedence: built-in defaults, .aizu/config.toml (with aizu.toml as legacy
+// fallback), and environment variables.
 package config
 
 import (
@@ -58,8 +59,9 @@ type tomlConfig struct {
 	} `toml:"poller"`
 }
 
-// Load resolves configuration from defaults, aizu.toml, and the environment.
-// It performs no network calls; BotUsername is resolved separately at startup.
+// Load resolves configuration from defaults, .aizu/config.toml (or aizu.toml
+// for backward compatibility), and the environment. It performs no network
+// calls; BotUsername is resolved separately at startup.
 func Load() *Config {
 	// 1. Defaults.
 	cfg := &Config{
@@ -71,8 +73,12 @@ func Load() *Config {
 		PollInterval:   15 * time.Second,
 	}
 
-	// 2. aizu.toml, if present in the working directory (override AIZU_CONFIG).
-	path := "aizu.toml"
+	// 2. TOML config file (override with AIZU_CONFIG).
+	//    Priority: AIZU_CONFIG env var > .aizu/config.toml > aizu.toml (legacy).
+	path := "aizu.toml" // legacy fallback
+	if _, err := os.Stat(".aizu/config.toml"); err == nil {
+		path = ".aizu/config.toml"
+	}
 	if v := os.Getenv("AIZU_CONFIG"); v != "" {
 		path = v
 	}

@@ -9,7 +9,7 @@ users = []   # optional: restrict to these GitHub logins; empty = allow all
 [agent]
 image = "ghcr.io/samhornstein/aizu-agent:pi"
 command = "pi -p \"$(cat {prompt_file})\""
-timeout = 600
+timeout = 1200
 
 [poller]
 interval_seconds = 15

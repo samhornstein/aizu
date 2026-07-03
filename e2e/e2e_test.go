@@ -30,8 +30,8 @@ func (m *mockExec) RunEngine(sid, prompt string) (int, string, error) {
 func (m *mockExec) ReadFile(sid, path string) (string, error) {
 	return "", errors.New("no file")
 }
-func (m *mockExec) Destroy(sid string)  {}
-func (m *mockExec) CleanupStale()       {}
+func (m *mockExec) Destroy(sid string) {}
+func (m *mockExec) CleanupStale()      {}
 
 // TestPipeline exercises the full flow: poller detects a GitHub comment,
 // enqueues to Redis, worker picks it up, runs the mock agent, and posts a reply.

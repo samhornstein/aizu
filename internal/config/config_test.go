@@ -80,6 +80,52 @@ interval_seconds = 45
 	}
 }
 
+func TestDotAizuConfigPreferred(t *testing.T) {
+	// Create a temp dir to act as working directory.
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	// Create .aizu/config.toml with one value and aizu.toml with another.
+	os.MkdirAll(".aizu", 0755)
+	os.WriteFile(".aizu/config.toml", []byte(`
+[trigger]
+keyword = "@dot"
+`), 0644)
+	os.WriteFile("aizu.toml", []byte(`
+[trigger]
+keyword = "@root"
+`), 0644)
+
+	cfg := Load()
+	if cfg.Trigger != "@dot" {
+		t.Errorf("Trigger = %q, want @dot (should prefer .aizu/config.toml)", cfg.Trigger)
+	}
+}
+
+func TestLegacyAizuTomlFallback(t *testing.T) {
+	tmpDir := t.TempDir()
+	origWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origWd)
+
+	// Only aizu.toml, no .aizu/ directory.
+	os.WriteFile("aizu.toml", []byte(`
+[trigger]
+keyword = "@legacy"
+repos   = ["owner/repo"]
+`), 0644)
+
+	cfg := Load()
+	if cfg.Trigger != "@legacy" {
+		t.Errorf("Trigger = %q, want @legacy (should fall back to aizu.toml)", cfg.Trigger)
+	}
+	if len(cfg.Repos) != 1 || cfg.Repos[0] != "owner/repo" {
+		t.Errorf("Repos = %v, want [owner/repo]", cfg.Repos)
+	}
+}
+
 func TestEnvListEmpty(t *testing.T) {
 	if got := envList("AIZU_TEST_NONEXISTENT_VAR"); got != nil {
 		t.Errorf("envList(missing) = %v, want nil", got)

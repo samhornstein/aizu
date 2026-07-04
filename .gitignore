@@ -1,6 +1,7 @@
 bin/
 dist/
 .env
+.aizu/
 *.db
 docs/public/
 docs/resources/

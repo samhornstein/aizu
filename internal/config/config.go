@@ -1,5 +1,10 @@
 // Package config loads Aizu's configuration from, in increasing order of
-// precedence: built-in defaults, an aizu.toml file, and environment variables.
+// precedence: built-in defaults, a TOML config file, and environment variables.
+//
+// The TOML file is resolved in this order:
+//  1. AIZU_CONFIG env var (explicit path)
+//  2. .aizu/config.toml (preferred — gitignored)
+//  3. aizu.toml (legacy — backward compatible)
 package config
 
 import (
@@ -58,8 +63,10 @@ type tomlConfig struct {
 	} `toml:"poller"`
 }
 
-// Load resolves configuration from defaults, aizu.toml, and the environment.
-// It performs no network calls; BotUsername is resolved separately at startup.
+// Load resolves configuration from defaults, a TOML config file, and the
+// environment. The TOML file is resolved: AIZU_CONFIG env > .aizu/config.toml
+// > aizu.toml. It performs no network calls; BotUsername is resolved separately
+// at startup.
 func Load() *Config {
 	// 1. Defaults.
 	cfg := &Config{
@@ -71,36 +78,43 @@ func Load() *Config {
 		PollInterval:   15 * time.Second,
 	}
 
-	// 2. aizu.toml, if present in the working directory (override AIZU_CONFIG).
-	path := "aizu.toml"
+	// 2. TOML config file (AIZU_CONFIG > .aizu/config.toml > aizu.toml).
+	path := ""
 	if v := os.Getenv("AIZU_CONFIG"); v != "" {
 		path = v
+	} else if _, err := os.Stat(".aizu/config.toml"); err == nil {
+		path = ".aizu/config.toml"
+	} else if _, err := os.Stat("aizu.toml"); err == nil {
+		path = "aizu.toml"
 	}
+
 	var tc tomlConfig
-	if _, err := toml.DecodeFile(path, &tc); err == nil {
-		if tc.Queue.RedisURL != "" {
-			cfg.RedisURL = tc.Queue.RedisURL
-		}
-		if tc.Trigger.Keyword != "" {
-			cfg.Trigger = tc.Trigger.Keyword
-		}
-		if len(tc.Trigger.Repos) > 0 {
-			cfg.Repos = tc.Trigger.Repos
-		}
-		if len(tc.Trigger.Users) > 0 {
-			cfg.Users = tc.Trigger.Users
-		}
-		if tc.Agent.Image != "" {
-			cfg.ContainerImage = tc.Agent.Image
-		}
-		if tc.Agent.Command != "" {
-			cfg.EngineCommand = tc.Agent.Command
-		}
-		if tc.Agent.Timeout != 0 {
-			cfg.Timeout = tc.Agent.Timeout
-		}
-		if tc.Poller.IntervalSeconds > 0 {
-			cfg.PollInterval = time.Duration(tc.Poller.IntervalSeconds) * time.Second
+	if path != "" {
+		if _, err := toml.DecodeFile(path, &tc); err == nil {
+			if tc.Queue.RedisURL != "" {
+				cfg.RedisURL = tc.Queue.RedisURL
+			}
+			if tc.Trigger.Keyword != "" {
+				cfg.Trigger = tc.Trigger.Keyword
+			}
+			if len(tc.Trigger.Repos) > 0 {
+				cfg.Repos = tc.Trigger.Repos
+			}
+			if len(tc.Trigger.Users) > 0 {
+				cfg.Users = tc.Trigger.Users
+			}
+			if tc.Agent.Image != "" {
+				cfg.ContainerImage = tc.Agent.Image
+			}
+			if tc.Agent.Command != "" {
+				cfg.EngineCommand = tc.Agent.Command
+			}
+			if tc.Agent.Timeout != 0 {
+				cfg.Timeout = tc.Agent.Timeout
+			}
+			if tc.Poller.IntervalSeconds > 0 {
+				cfg.PollInterval = time.Duration(tc.Poller.IntervalSeconds) * time.Second
+			}
 		}
 	}
 

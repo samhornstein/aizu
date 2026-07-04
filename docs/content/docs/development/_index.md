@@ -32,9 +32,10 @@ make vet fmt    # static analysis and formatting
 
 ```bash
 cp .env.example .env   # fill in GITHUB_TOKEN and model credentials
+cp -r .aizu.example .aizu
 ```
 
-Edit `aizu.toml` to set the repos to watch:
+Edit `.aizu/config.toml` to set the repos to watch:
 
 ```toml
 [trigger]

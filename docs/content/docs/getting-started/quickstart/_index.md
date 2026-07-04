@@ -27,6 +27,7 @@ Then from the bot account, generate a [classic token](https://github.com/setting
 ```bash
 git clone https://github.com/samhornstein/aizu.git && cd aizu
 cp .env.example .env
+cp -r .aizu.example .aizu
 ```
 
 Edit `.env` and add the bot account's token:
@@ -35,7 +36,7 @@ Edit `.env` and add the bot account's token:
 GITHUB_TOKEN=ghp_YOUR_BOT_TOKEN_HERE
 ```
 
-Edit `aizu.toml` to set the repositories Aizu should watch (required):
+Edit `.aizu/config.toml` to set the repositories Aizu should watch (required):
 
 ```toml
 [trigger]
@@ -94,15 +95,15 @@ docker compose logs -f aizu
 docker compose up -d --build
 ```
 
-**Restart without rebuilding** (e.g. after editing `aizu.toml` or `.env`):
+**Restart without rebuilding** (e.g. after editing `.aizu/config.toml` or `.env`):
 ```bash
 docker compose restart aizu
 ```
 
 **Aizu isn't picking up comments:**
 - Make sure the comment is from your *personal* account, not the bot account — Aizu ignores its own token's account.
-- Check that your message begins with the `keyword` in `aizu.toml`.
-- Check that `repos` in `aizu.toml` matches the repo exactly (`owner/repo`).
+- Check that your message begins with the `keyword` in `.aizu/config.toml`.
+- Check that `repos` in `.aizu/config.toml` matches the repo exactly (`owner/repo`).
 - The poller runs every 15 seconds; wait one interval then check the logs.
 
 **Agent fails with "no models returned" or connection error:**
@@ -111,4 +112,4 @@ docker compose restart aizu
 
 **Container exits immediately:**
 - Run `docker compose logs aizu` (without `-f`) to see the error before it restarts.
-- `no repos configured` means `repos` in `aizu.toml` is empty or the file failed to parse — check for missing quotes around repo names.
+- `no repos configured` means `repos` in `.aizu/config.toml` is empty or the file failed to parse — check for missing quotes around repo names.

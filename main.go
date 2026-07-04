@@ -47,7 +47,7 @@ func main() {
 	cfg := config.Load()
 
 	if (mode == "all" || mode == "poller") && len(cfg.Repos) == 0 {
-		fmt.Fprintf(os.Stderr, "Error: no repos configured. Set [trigger].repos in aizu.toml or AIZU_REPOS env var.\n")
+		fmt.Fprintf(os.Stderr, "Error: no repos configured. Set [trigger].repos in .aizu/config.toml or AIZU_REPOS env var.\n")
 		os.Exit(1)
 	}
 

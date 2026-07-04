@@ -14,12 +14,12 @@ services:
     # The worker launches agent sandboxes via the host Docker daemon.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./aizu.toml:/etc/aizu/aizu.toml:ro
+      - ./.aizu:/etc/aizu:ro
     env_file:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379
-      - AIZU_CONFIG=/etc/aizu/aizu.toml
+      - AIZU_CONFIG=/etc/aizu/config.toml
     depends_on:
       - redis
     networks:

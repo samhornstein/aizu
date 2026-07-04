@@ -55,5 +55,6 @@ volumes:
 
 ## Overrides
 
-All `aizu.toml` settings can be overridden via environment variables (e.g.
-`AIZU_TIMEOUT`, `POLL_INTERVAL`, `AIZU_REPOS`). Secrets are environment-only.
+All `.aizu/config.toml` settings can be overridden via environment variables
+(e.g. `AIZU_TIMEOUT`, `POLL_INTERVAL`, `AIZU_REPOS`). Secrets are
+environment-only.

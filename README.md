@@ -86,6 +86,28 @@ Within one polling interval (15 seconds by default) Aizu reacts with 👀, runs 
 
 > **Note:** With a small local model the reply may be incoherent or raw JSON — that's expected. The goal here is just to confirm the pipeline works end-to-end. For real tasks, use a larger model or an API key.
 
+## Webhooks
+
+Instead of polling, you can configure Aizu to listen for GitHub webhooks. This provides near-instant response times and reduces API usage.
+
+1. In `aizu.toml`, enable webhooks:
+
+    ```toml
+    [webhook]
+    enabled = true
+    secret = "your-webhook-secret"
+    ```
+
+2. In your GitHub repo, go to **Settings → Webhooks → Add webhook**:
+   - **Payload URL:** `http://<your-server>:8080/`
+   - **Content type:** `application/json`
+   - **Secret:** the same secret from `aizu.toml`
+   - **Events:** Select "Let me select individual events" → check **Issues** and **Issue comments**
+
+3. Restart Aizu. The poller will still run alongside webhooks unless you disable it with `POLL_INTERVAL=0` or run Aizu in `worker` mode only.
+
+Webhooks support the same trigger keyword, user allowlist, and self-comment filtering as the poller.
+
 ## Docs
 
 Full documentation: `make docs-serve`

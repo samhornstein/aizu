@@ -8,6 +8,7 @@ import (
 	_ "embed"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -20,6 +21,7 @@ import (
 	"github.com/samhornstein/aizu/internal/poller"
 	"github.com/samhornstein/aizu/internal/queue"
 	"github.com/samhornstein/aizu/internal/template"
+	"github.com/samhornstein/aizu/internal/webhook"
 	"github.com/samhornstein/aizu/internal/worker"
 )
 
@@ -95,7 +97,31 @@ func main() {
 		}()
 	}
 
-	slog.Info("Aizu started", "mode", mode)
+	// Start webhook HTTP server if enabled.
+	if cfg.WebhookEnabled {
+		handler := webhook.New(cfg, gh, q)
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", handler.ServeHTTP)
+		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, "ok")
+		})
+		server := &http.Server{Addr: ":8080", Handler: mux}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			slog.Info("Webhook server started", "addr", ":8080")
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("Webhook server error", "error", err)
+			}
+		}()
+		go func() {
+			<-ctx.Done()
+			_ = server.Shutdown(context.Background())
+		}()
+	}
+
+	slog.Info("Aizu started", "mode", mode, "webhook", cfg.WebhookEnabled)
 	<-ctx.Done()
 	wg.Wait()
 	slog.Info("Shutdown complete")

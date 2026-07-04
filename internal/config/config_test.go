@@ -13,6 +13,8 @@ func TestEnvOverrides(t *testing.T) {
 	t.Setenv("POLL_INTERVAL", "60")
 	t.Setenv("AIZU_TIMEOUT", "300")
 	t.Setenv("REDIS_URL", "redis://myhost:6379")
+	t.Setenv("AIZU_WEBHOOK_ENABLED", "true")
+	t.Setenv("AIZU_WEBHOOK_SECRET", "webhook-secret")
 
 	cfg := Load()
 
@@ -34,6 +36,12 @@ func TestEnvOverrides(t *testing.T) {
 	if cfg.RedisURL != "redis://myhost:6379" {
 		t.Errorf("RedisURL = %q, want redis://myhost:6379", cfg.RedisURL)
 	}
+	if !cfg.WebhookEnabled {
+		t.Error("WebhookEnabled = false, want true")
+	}
+	if cfg.WebhookSecret != "webhook-secret" {
+		t.Errorf("WebhookSecret = %q, want webhook-secret", cfg.WebhookSecret)
+	}
 }
 
 func TestTOMLOverride(t *testing.T) {
@@ -54,6 +62,10 @@ timeout = 120
 
 [poller]
 interval_seconds = 45
+
+[webhook]
+enabled = true
+secret  = "toml-secret"
 `)
 	f.Close()
 	if err != nil {
@@ -77,6 +89,12 @@ interval_seconds = 45
 	}
 	if cfg.PollInterval != 45*time.Second {
 		t.Errorf("PollInterval = %v, want 45s", cfg.PollInterval)
+	}
+	if !cfg.WebhookEnabled {
+		t.Error("WebhookEnabled = false, want true (from TOML)")
+	}
+	if cfg.WebhookSecret != "toml-secret" {
+		t.Errorf("WebhookSecret = %q, want toml-secret", cfg.WebhookSecret)
 	}
 }
 

@@ -37,6 +37,10 @@ type Config struct {
 	AnthropicKey  string
 	OpenAIKey     string
 	OpenAIBaseURL string
+
+	// Webhook
+	WebhookEnabled bool
+	WebhookSecret  string // HMAC-SHA256 secret for verifying webhook signatures
 }
 
 type tomlConfig struct {
@@ -56,6 +60,10 @@ type tomlConfig struct {
 	Poller struct {
 		IntervalSeconds int `toml:"interval_seconds"`
 	} `toml:"poller"`
+	Webhook struct {
+		Enabled bool   `toml:"enabled"`
+		Secret  string `toml:"secret"`
+	} `toml:"webhook"`
 }
 
 // Load resolves configuration from defaults, aizu.toml, and the environment.
@@ -102,6 +110,12 @@ func Load() *Config {
 		if tc.Poller.IntervalSeconds > 0 {
 			cfg.PollInterval = time.Duration(tc.Poller.IntervalSeconds) * time.Second
 		}
+		if tc.Webhook.Enabled {
+			cfg.WebhookEnabled = true
+		}
+		if tc.Webhook.Secret != "" {
+			cfg.WebhookSecret = tc.Webhook.Secret
+		}
 	}
 
 	// 3. Environment overrides (highest precedence).
@@ -136,6 +150,14 @@ func Load() *Config {
 	cfg.OpenAIKey = os.Getenv("OPENAI_API_KEY")
 	if v := os.Getenv("OPENAI_BASE_URL"); v != "" {
 		cfg.OpenAIBaseURL = v
+	}
+
+	// Webhook settings.
+	if v := os.Getenv("AIZU_WEBHOOK_ENABLED"); v == "true" || v == "1" {
+		cfg.WebhookEnabled = true
+	}
+	if v := os.Getenv("AIZU_WEBHOOK_SECRET"); v != "" {
+		cfg.WebhookSecret = v
 	}
 
 	return cfg

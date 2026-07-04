@@ -13,3 +13,11 @@ timeout = 1200
 
 [poller]
 interval_seconds = 15
+
+# Webhook mode: when enabled, Aizu listens on :8080 for GitHub webhook events
+# instead of (or in addition to) polling. Requires configuring a webhook in your
+# repo settings pointing to http://<your-server>:8080/.
+# Set `secret` to the webhook secret for HMAC signature verification.
+[webhook]
+enabled = false
+# secret = "your-webhook-secret"

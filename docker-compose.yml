@@ -20,6 +20,8 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - AIZU_CONFIG=/etc/aizu/aizu.toml
+    ports:
+      - "8080:8080"  # webhook endpoint (only used when webhook.enabled = true)
     depends_on:
       - redis
     networks:

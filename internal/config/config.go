@@ -33,6 +33,11 @@ type Config struct {
 	// Poller
 	PollInterval time.Duration
 
+	// Rate limiting
+	MaxConcurrent     int           // max concurrent workers (0 = unlimited, default 1)
+	RequestsPerMinute int           // max requests per minute (0 = unlimited)
+	RateWindowDuration time.Duration // time window for rate limiting (default 1 minute)
+
 	// Model credentials passed through to the agent container
 	AnthropicKey  string
 	OpenAIKey     string
@@ -56,6 +61,11 @@ type tomlConfig struct {
 	Poller struct {
 		IntervalSeconds int `toml:"interval_seconds"`
 	} `toml:"poller"`
+	RateLimit struct {
+		MaxConcurrent     int `toml:"max_concurrent"`
+		RequestsPerMinute int `toml:"requests_per_minute"`
+		RateWindowSeconds int `toml:"rate_window_seconds"`
+	} `toml:"ratelimit"`
 }
 
 // Load resolves configuration from defaults, aizu.toml, and the environment.
@@ -68,7 +78,10 @@ func Load() *Config {
 		ContainerImage: "ghcr.io/samhornstein/aizu-agent:pi",
 		EngineCommand:  `pi -p "$(cat {prompt_file})"`,
 		Timeout:        600,
-		PollInterval:   15 * time.Second,
+		PollInterval:       15 * time.Second,
+		MaxConcurrent:      1,
+		RequestsPerMinute:  0, // 0 = unlimited
+		RateWindowDuration: time.Minute,
 	}
 
 	// 2. aizu.toml, if present in the working directory (override AIZU_CONFIG).
@@ -102,6 +115,15 @@ func Load() *Config {
 		if tc.Poller.IntervalSeconds > 0 {
 			cfg.PollInterval = time.Duration(tc.Poller.IntervalSeconds) * time.Second
 		}
+		if tc.RateLimit.MaxConcurrent > 0 {
+			cfg.MaxConcurrent = tc.RateLimit.MaxConcurrent
+		}
+		if tc.RateLimit.RequestsPerMinute > 0 {
+			cfg.RequestsPerMinute = tc.RateLimit.RequestsPerMinute
+		}
+		if tc.RateLimit.RateWindowSeconds > 0 {
+			cfg.RateWindowDuration = time.Duration(tc.RateLimit.RateWindowSeconds) * time.Second
+		}
 	}
 
 	// 3. Environment overrides (highest precedence).
@@ -128,6 +150,15 @@ func Load() *Config {
 	}
 	if n, ok := envInt("POLL_INTERVAL"); ok && n > 0 {
 		cfg.PollInterval = time.Duration(n) * time.Second
+	}
+	if n, ok := envInt("AIZU_MAX_CONCURRENT"); ok && n > 0 {
+		cfg.MaxConcurrent = n
+	}
+	if n, ok := envInt("AIZU_REQUESTS_PER_MINUTE"); ok && n > 0 {
+		cfg.RequestsPerMinute = n
+	}
+	if n, ok := envInt("AIZU_RATE_WINDOW_SECONDS"); ok && n > 0 {
+		cfg.RateWindowDuration = time.Duration(n) * time.Second
 	}
 
 	// Secrets are environment-only.

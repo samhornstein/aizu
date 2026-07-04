@@ -53,6 +53,7 @@ func main() {
 
 	gh := github.New(cfg.GitHubToken)
 	q := queue.New(cfg.RedisURL)
+	q.SetRateLimit(cfg.RequestsPerMinute, cfg.RateWindowDuration)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -82,8 +83,8 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			slog.Info("Worker started")
-			worker.New(q, exec, gh, loader).Run(ctx)
+			slog.Info("Worker started", "maxConcurrent", cfg.MaxConcurrent)
+			worker.New(q, exec, gh, loader, worker.WithMaxConcurrent(cfg.MaxConcurrent)).Run(ctx)
 		}()
 	}
 

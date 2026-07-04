@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"github.com/samhornstein/aizu/internal/ratelimit"
 )
 
 const (
@@ -53,7 +54,8 @@ type Task struct {
 
 // Queue wraps a Redis client.
 type Queue struct {
-	rdb *redis.Client
+	rdb  *redis.Client
+	limiter *ratelimit.Limiter
 }
 
 // New connects to Redis. An unparseable URL falls back to localhost.
@@ -63,7 +65,13 @@ func New(redisURL string) *Queue {
 		slog.Error("Invalid Redis URL, falling back to localhost:6379", "url", redisURL, "error", err)
 		opts = &redis.Options{Addr: "localhost:6379"}
 	}
-	return &Queue{rdb: redis.NewClient(opts)}
+	return &Queue{rdb: redis.NewClient(opts), limiter: ratelimit.New(0, time.Minute)}
+}
+
+// SetRateLimit configures the rate limiter.
+// A capacity of 0 disables rate limiting.
+func (q *Queue) SetRateLimit(capacity int, window time.Duration) {
+	q.limiter = ratelimit.New(capacity, window)
 }
 
 // Client exposes the underlying Redis client (used by the poller for "since" state).
@@ -75,8 +83,13 @@ func activeKey(repo string, number int) string {
 
 // Enqueue atomically checks whether the issue/PR already has an active task and,
 // if not, creates and queues a new one. Returns (nil, nil) if skipped because
-// a task is already running or queued for that issue/PR.
+// a task is already running or queued for that issue/PR. Respects rate limits
+// if configured.
 func (q *Queue) Enqueue(ctx context.Context, repo string, number int, commentID int64, body, author string) (*Task, error) {
+	if !q.limiter.Allow() {
+		slog.Info("Rate limit reached, skipping enqueue", "repo", repo, "number", number)
+		return nil, nil
+	}
 	task := &Task{
 		ID:        uuid.New().String()[:8],
 		Repo:      repo,

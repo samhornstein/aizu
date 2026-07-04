@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/samhornstein/aizu/internal/executor"
@@ -16,24 +17,45 @@ import (
 	"github.com/samhornstein/aizu/internal/template"
 )
 
-// Worker processes one task at a time from the shared queue.
+// Worker processes tasks from the shared queue.
 type Worker struct {
 	q      *queue.Queue
 	exec   executor.Executor
 	gh     *github.Client
 	loader *template.Loader
+	sem    chan struct{} // concurrency semaphore (nil = unlimited)
+}
+
+// WorkerOption configures a Worker.
+type WorkerOption func(*Worker)
+
+// WithMaxConcurrent sets the maximum number of concurrent task processors.
+// A value of 0 means unlimited concurrency.
+func WithMaxConcurrent(n int) WorkerOption {
+	return func(w *Worker) {
+		if n > 0 {
+			w.sem = make(chan struct{}, n)
+		}
+	}
 }
 
 // New constructs a Worker.
-func New(q *queue.Queue, exec executor.Executor, gh *github.Client, loader *template.Loader) *Worker {
-	return &Worker{q: q, exec: exec, gh: gh, loader: loader}
+func New(q *queue.Queue, exec executor.Executor, gh *github.Client, loader *template.Loader, opts ...WorkerOption) *Worker {
+	w := &Worker{q: q, exec: exec, gh: gh, loader: loader}
+	for _, opt := range opts {
+		opt(w)
+	}
+	return w
 }
 
 // Run loops until ctx is cancelled, processing tasks as they arrive.
+// Supports concurrent processing via the semaphore if configured.
 func (w *Worker) Run(ctx context.Context) {
+	var wg sync.WaitGroup
+
 	for {
 		if ctx.Err() != nil {
-			return
+			break
 		}
 		task, err := w.q.NextPending(ctx, 5*time.Second)
 		if err != nil {
@@ -43,8 +65,27 @@ func (w *Worker) Run(ctx context.Context) {
 		if task == nil {
 			continue
 		}
-		w.process(ctx, task)
+
+		// Acquire semaphore if concurrency is limited.
+		if w.sem != nil {
+			select {
+			case w.sem <- struct{}{}:
+			case <-ctx.Done():
+				break
+			}
+		}
+
+		wg.Add(1)
+		go func(t *queue.Task) {
+			defer wg.Done()
+			w.process(ctx, t)
+			if w.sem != nil {
+				<-w.sem
+			}
+		}(task)
 	}
+
+	wg.Wait()
 }
 
 func (w *Worker) process(ctx context.Context, task *queue.Task) {

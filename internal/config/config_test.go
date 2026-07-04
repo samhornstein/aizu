@@ -13,6 +13,9 @@ func TestEnvOverrides(t *testing.T) {
 	t.Setenv("POLL_INTERVAL", "60")
 	t.Setenv("AIZU_TIMEOUT", "300")
 	t.Setenv("REDIS_URL", "redis://myhost:6379")
+	t.Setenv("AIZU_MAX_CONCURRENT", "4")
+	t.Setenv("AIZU_REQUESTS_PER_MINUTE", "20")
+	t.Setenv("AIZU_RATE_WINDOW_SECONDS", "30")
 
 	cfg := Load()
 
@@ -33,6 +36,15 @@ func TestEnvOverrides(t *testing.T) {
 	}
 	if cfg.RedisURL != "redis://myhost:6379" {
 		t.Errorf("RedisURL = %q, want redis://myhost:6379", cfg.RedisURL)
+	}
+	if cfg.MaxConcurrent != 4 {
+		t.Errorf("MaxConcurrent = %d, want 4", cfg.MaxConcurrent)
+	}
+	if cfg.RequestsPerMinute != 20 {
+		t.Errorf("RequestsPerMinute = %d, want 20", cfg.RequestsPerMinute)
+	}
+	if cfg.RateWindowDuration != 30*time.Second {
+		t.Errorf("RateWindowDuration = %v, want 30s", cfg.RateWindowDuration)
 	}
 }
 
@@ -77,6 +89,54 @@ interval_seconds = 45
 	}
 	if cfg.PollInterval != 45*time.Second {
 		t.Errorf("PollInterval = %v, want 45s", cfg.PollInterval)
+	}
+}
+
+func TestRateLimitDefaults(t *testing.T) {
+	cfg := Load()
+	if cfg.MaxConcurrent != 1 {
+		t.Errorf("MaxConcurrent default = %d, want 1", cfg.MaxConcurrent)
+	}
+	if cfg.RequestsPerMinute != 0 {
+		t.Errorf("RequestsPerMinute default = %d, want 0 (unlimited)", cfg.RequestsPerMinute)
+	}
+	if cfg.RateWindowDuration != time.Minute {
+		t.Errorf("RateWindowDuration default = %v, want 1m", cfg.RateWindowDuration)
+	}
+}
+
+func TestTOMLRateLimit(t *testing.T) {
+	f, err := os.CreateTemp("", "aizu-test-*.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+
+	_, err = f.WriteString(`
+[trigger]
+repos = ["owner/repo"]
+
+[ratelimit]
+max_concurrent = 5
+requests_per_minute = 10
+rate_window_seconds = 120
+`)
+	f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("AIZU_CONFIG", f.Name())
+
+	cfg := Load()
+	if cfg.MaxConcurrent != 5 {
+		t.Errorf("MaxConcurrent = %d, want 5", cfg.MaxConcurrent)
+	}
+	if cfg.RequestsPerMinute != 10 {
+		t.Errorf("RequestsPerMinute = %d, want 10", cfg.RequestsPerMinute)
+	}
+	if cfg.RateWindowDuration != 120*time.Second {
+		t.Errorf("RateWindowDuration = %v, want 120s", cfg.RateWindowDuration)
 	}
 }
 

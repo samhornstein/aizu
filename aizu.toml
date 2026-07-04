@@ -13,3 +13,12 @@ timeout = 1200
 
 [poller]
 interval_seconds = 15
+
+# Rate limiting (optional)
+# max_concurrent: max parallel agent runs (default 1)
+# requests_per_minute: max tasks enqueued per window (0 = unlimited)
+# rate_window_seconds: window duration for requests_per_minute (default 60)
+[ratelimit]
+# max_concurrent = 1
+# requests_per_minute = 0
+# rate_window_seconds = 60

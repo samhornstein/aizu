@@ -67,7 +67,7 @@ func Load() *Config {
 		Trigger:        "@aizu",
 		ContainerImage: "ghcr.io/samhornstein/aizu-agent:pi",
 		EngineCommand:  `pi -p "$(cat {prompt_file})"`,
-		Timeout:        600,
+		Timeout:        3600,
 		PollInterval:   15 * time.Second,
 	}
 

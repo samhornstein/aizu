@@ -138,12 +138,16 @@ func (e *containerExecutor) RunEngine(sid, prompt string) (int, string, error) {
 
 	output, err := e.exec(sid, full, time.Duration(e.cfg.Timeout)*time.Second)
 	if err != nil {
-		if _, ok := err.(*exec.ExitError); ok {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 124 {
+				slog.Warn("Engine timed out", "timeout", e.cfg.Timeout, "sid", sid)
+				return 124, fmt.Sprintf("Aizu timed out after %ds. Increase the timeout in aizu.toml or set AIZU_TIMEOUT.", e.cfg.Timeout), nil
+			}
 			return 1, output, nil
 		}
 		if strings.Contains(err.Error(), "signal: killed") {
 			slog.Warn("Engine timed out", "timeout", e.cfg.Timeout, "sid", sid)
-			return 124, fmt.Sprintf("Timed out after %ds", e.cfg.Timeout), nil
+			return 124, fmt.Sprintf("Aizu timed out after %ds. Increase the timeout in aizu.toml or set AIZU_TIMEOUT.", e.cfg.Timeout), nil
 		}
 		return 1, output, err
 	}

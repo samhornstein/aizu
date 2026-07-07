@@ -1,15 +1,14 @@
 name: Release
 
-# Intentional, milestone-based releases: generates a changelog from Conventional
-# Commits (git-cliff) and cuts a GitHub Release. Trigger it either by pushing a
-# tag (`git tag v0.2.0 && git push origin v0.2.0`) or from the Actions tab
-# ("Run workflow" — leave version blank to auto-compute the next version).
+# Cut a release from the Actions tab: Release -> Run workflow. Leave "version"
+# blank to auto-compute the next version from your Conventional Commits
+# (git-cliff): feat -> minor, fix -> patch, ! / BREAKING -> major. It tags the
+# commit, generates a changelog, and publishes a GitHub Release.
 #
 # No container images are published: the default install builds from source
-# (see docker-compose.yml), so there's nothing to pull.
+# (see docker-compose.yml), so there's nothing to pull. The version of a running
+# instance is the commit it was built from (`git describe --tags` in the clone).
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
@@ -17,7 +16,7 @@ on:
         required: false
 
 permissions:
-  contents: write # create tags + releases
+  contents: write # push the tag + create the release
 
 jobs:
   release:
@@ -25,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # full history + tags for the changelog and version bump
 
       - name: Install git-cliff
         uses: taiki-e/install-action@v2
@@ -36,24 +35,19 @@ jobs:
         id: ver
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "push" ]; then
-            next="${{ github.ref_name }}"                       # the tag that was pushed
-          elif [ -n "${{ github.event.inputs.version }}" ]; then
-            next="${{ github.event.inputs.version }}"           # explicit dispatch input
+          latest=$(git tag --sort=-v:refname | head -n1)
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            next="${{ github.event.inputs.version }}"          # explicit override
+          elif [ -z "$latest" ]; then
+            next="v0.1.0"                                      # bootstrap first release
           else
-            latest=$(git tag --sort=-v:refname | head -n1)
-            if [ -z "$latest" ]; then
-              next="v0.1.0"                                     # bootstrap first release
-            else
-              next=$(git cliff --bumped-version 2>/dev/null || echo "$latest")
-            fi
+            next=$(git cliff --bumped-version 2>/dev/null || echo "$latest")
           fi
-          next="v${next#v}"                                     # normalize to a single v prefix
+          next="v${next#v}"                                   # normalize to a single v prefix
           echo "next=$next" >> "$GITHUB_OUTPUT"
           echo "Releasing $next"
 
-      - name: Create and push tag
-        if: github.event_name == 'workflow_dispatch'
+      - name: Tag the release
         run: |
           set -euo pipefail
           if git rev-parse -q --verify "refs/tags/${{ steps.ver.outputs.next }}" >/dev/null; then

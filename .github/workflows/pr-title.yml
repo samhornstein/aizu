@@ -5,7 +5,7 @@ name: PR Title
 # what drives automated versioning (see release.yml). This works for every
 # contributor without them installing the local commit-msg hook.
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, edited, reopened]
 
 permissions:

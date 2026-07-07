@@ -6,7 +6,7 @@ name: PR Title
 # contributor without them installing the local commit-msg hook.
 on:
   pull_request:
-    types: [opened, edited, reopened]
+    types: [opened, edited, reopened, synchronize]
 
 permissions:
   pull-requests: read

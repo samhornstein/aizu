@@ -8,8 +8,11 @@ services:
       - aizu-net
 
   aizu:
-    image: ghcr.io/samhornstein/aizu:latest
+    # Aizu is built from the source you cloned, so you always run exactly what's
+    # in your working tree. Re-run with `docker compose up -d --build` after
+    # pulling changes.
     build: .
+    image: aizu:local
     restart: unless-stopped
     # The worker launches agent sandboxes via the host Docker daemon.
     volumes:

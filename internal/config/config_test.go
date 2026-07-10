@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"testing"
 	"time"
 )
@@ -36,47 +35,20 @@ func TestEnvOverrides(t *testing.T) {
 	}
 }
 
-func TestTOMLOverride(t *testing.T) {
-	f, err := os.CreateTemp("", "aizu-test-*.toml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-
-	_, err = f.WriteString(`
-[trigger]
-keyword = "@bot"
-repos   = ["owner/repo"]
-users   = ["alice"]
-
-[agent]
-timeout = 120
-
-[poller]
-interval_seconds = 45
-`)
-	f.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Setenv("AIZU_CONFIG", f.Name())
-
+func TestDefaults(t *testing.T) {
 	cfg := Load()
-	if cfg.Trigger != "@bot" {
-		t.Errorf("Trigger = %q, want @bot", cfg.Trigger)
+
+	if cfg.Trigger != "aizu" {
+		t.Errorf("Trigger = %q, want aizu", cfg.Trigger)
 	}
-	if len(cfg.Repos) != 1 || cfg.Repos[0] != "owner/repo" {
-		t.Errorf("Repos = %v, want [owner/repo]", cfg.Repos)
+	if cfg.ContainerImage != "aizu-agent:pi" {
+		t.Errorf("ContainerImage = %q, want aizu-agent:pi", cfg.ContainerImage)
 	}
-	if len(cfg.Users) != 1 || cfg.Users[0] != "alice" {
-		t.Errorf("Users = %v, want [alice]", cfg.Users)
+	if cfg.Timeout != 3600 {
+		t.Errorf("Timeout = %d, want 3600", cfg.Timeout)
 	}
-	if cfg.Timeout != 120 {
-		t.Errorf("Timeout = %d, want 120", cfg.Timeout)
-	}
-	if cfg.PollInterval != 45*time.Second {
-		t.Errorf("PollInterval = %v, want 45s", cfg.PollInterval)
+	if cfg.PollInterval != 15*time.Second {
+		t.Errorf("PollInterval = %v, want 15s", cfg.PollInterval)
 	}
 }
 

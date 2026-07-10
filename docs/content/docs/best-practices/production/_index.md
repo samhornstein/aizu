@@ -46,10 +46,11 @@ server, not Aizu. To scale:
 
 ```bash
 git pull origin main
+docker compose build agent      # rebuild the agent sandbox if its Dockerfile changed
 docker compose up -d --build
 ```
 
 ## Backup
 
-Back up `.env` (tokens), `aizu.toml` (config), and Redis data if using
+Back up `.env` (config + tokens) and Redis data if using
 persistence.

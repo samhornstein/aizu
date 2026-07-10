@@ -1,5 +1,5 @@
 // Package config loads Aizu's configuration from, in increasing order of
-// precedence: built-in defaults, an aizu.toml file, and environment variables.
+// precedence: built-in defaults and environment variables.
 package config
 
 import (
@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/BurntSushi/toml"
 )
 
 // Config is the fully-resolved runtime configuration.
@@ -17,7 +15,7 @@ type Config struct {
 	RedisURL string
 
 	// Trigger
-	Trigger string   // keyword that fires the agent, e.g. "@aizu"
+	Trigger string   // keyword that fires the agent; must begin the comment, e.g. "aizu"
 	Repos   []string // "owner/repo" list; empty means auto-discover the token owner's repos
 	Users   []string // allowlisted comment authors; empty means allow everyone
 
@@ -39,72 +37,20 @@ type Config struct {
 	OpenAIBaseURL string
 }
 
-type tomlConfig struct {
-	Queue struct {
-		RedisURL string `toml:"redis_url"`
-	} `toml:"queue"`
-	Trigger struct {
-		Keyword string   `toml:"keyword"`
-		Repos   []string `toml:"repos"`
-		Users   []string `toml:"users"`
-	} `toml:"trigger"`
-	Agent struct {
-		Image   string `toml:"image"`
-		Command string `toml:"command"`
-		Timeout int    `toml:"timeout"`
-	} `toml:"agent"`
-	Poller struct {
-		IntervalSeconds int `toml:"interval_seconds"`
-	} `toml:"poller"`
-}
-
-// Load resolves configuration from defaults, aizu.toml, and the environment.
+// Load resolves configuration from built-in defaults and the environment.
 // It performs no network calls; BotUsername is resolved separately at startup.
 func Load() *Config {
 	// 1. Defaults.
 	cfg := &Config{
 		RedisURL:       "redis://localhost:6379",
-		Trigger:        "@aizu",
-		ContainerImage: "ghcr.io/samhornstein/aizu-agent:pi",
+		Trigger:        "aizu",
+		ContainerImage: "aizu-agent:pi", // pi-engine sandbox, built via `docker compose build agent`
 		EngineCommand:  `pi -p "$(cat {prompt_file})"`,
-		Timeout:        600,
+		Timeout:        3600,
 		PollInterval:   15 * time.Second,
 	}
 
-	// 2. aizu.toml, if present in the working directory (override AIZU_CONFIG).
-	path := "aizu.toml"
-	if v := os.Getenv("AIZU_CONFIG"); v != "" {
-		path = v
-	}
-	var tc tomlConfig
-	if _, err := toml.DecodeFile(path, &tc); err == nil {
-		if tc.Queue.RedisURL != "" {
-			cfg.RedisURL = tc.Queue.RedisURL
-		}
-		if tc.Trigger.Keyword != "" {
-			cfg.Trigger = tc.Trigger.Keyword
-		}
-		if len(tc.Trigger.Repos) > 0 {
-			cfg.Repos = tc.Trigger.Repos
-		}
-		if len(tc.Trigger.Users) > 0 {
-			cfg.Users = tc.Trigger.Users
-		}
-		if tc.Agent.Image != "" {
-			cfg.ContainerImage = tc.Agent.Image
-		}
-		if tc.Agent.Command != "" {
-			cfg.EngineCommand = tc.Agent.Command
-		}
-		if tc.Agent.Timeout != 0 {
-			cfg.Timeout = tc.Agent.Timeout
-		}
-		if tc.Poller.IntervalSeconds > 0 {
-			cfg.PollInterval = time.Duration(tc.Poller.IntervalSeconds) * time.Second
-		}
-	}
-
-	// 3. Environment overrides (highest precedence).
+	// 2. Environment overrides.
 	if v := os.Getenv("REDIS_URL"); v != "" {
 		cfg.RedisURL = v
 	}

@@ -31,18 +31,11 @@ make vet fmt    # static analysis and formatting
 ## Running locally
 
 ```bash
-cp .env.example .env   # fill in GITHUB_TOKEN and model credentials
-```
-
-Edit `aizu.toml` to set the repos to watch:
-
-```toml
-[trigger]
-repos = ["owner/repo"]
+cp .env.example .env   # set GITHUB_TOKEN, AIZU_REPOS, and model credentials
 ```
 
 ```bash
-make up                        # start Aizu + Redis via Docker Compose
+make up                        # build the agent image, then start Aizu + Redis
 docker compose logs -f aizu    # tail logs
 ```
 
@@ -59,6 +52,16 @@ is no prebuilt image to pull. After changing code or config, rebuild with:
 
 ```bash
 docker compose up -d --build
+```
+
+The agent sandbox image (`aizu-agent:pi`, from `templates/pi/Dockerfile`) is
+also built from source, via the `agent` Compose profile — `make up` builds it
+for you. The tag names the engine; to run a different agent, add
+`templates/<engine>/Dockerfile` and set `CONTAINER_IMAGE`/`ENGINE_COMMAND` for
+it. Rebuild after changing the agent Dockerfile:
+
+```bash
+docker compose build agent
 ```
 
 ## Commits

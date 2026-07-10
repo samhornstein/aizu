@@ -14,9 +14,18 @@ func newTestPoller(cfg *config.Config) *Poller {
 func TestShouldTriggerKeyword(t *testing.T) {
 	p := newTestPoller(&config.Config{Trigger: "@aizu"})
 
-	c := github.Comment{Body: "hey @aizu fix this", User: github.User{Login: "alice"}}
+	c := github.Comment{Body: "@aizu fix this", User: github.User{Login: "alice"}}
 	if !p.shouldTrigger("owner/repo", c) {
-		t.Error("shouldTrigger() = false, want true for matching keyword")
+		t.Error("shouldTrigger() = false, want true when comment begins with the keyword")
+	}
+}
+
+func TestShouldTriggerKeywordMidComment(t *testing.T) {
+	p := newTestPoller(&config.Config{Trigger: "@aizu"})
+
+	c := github.Comment{Body: "hey @aizu fix this", User: github.User{Login: "alice"}}
+	if p.shouldTrigger("owner/repo", c) {
+		t.Error("shouldTrigger() = true, want false when the keyword is not at the start")
 	}
 }
 

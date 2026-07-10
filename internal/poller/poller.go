@@ -1,6 +1,6 @@
 // Package poller periodically polls GitHub for new issue/PR comments and
-// enqueues a task for each comment that mentions the trigger keyword.
-// It also polls for issues with the trigger keyword in their body.
+// enqueues a task for each comment that begins with the trigger keyword.
+// It also polls for issues whose body begins with the trigger keyword.
 //
 // Per-repo "since" state lives in Redis.
 package poller
@@ -94,8 +94,8 @@ func (p *Poller) pollRepo(ctx context.Context, repo string) error {
 	return nil
 }
 
-// pollIssues checks for issues (including PRs) that have the trigger keyword
-// in their body and enqueues them.
+// pollIssues checks for issues (including PRs) whose body begins with the
+// trigger keyword and enqueues them.
 func (p *Poller) pollIssues(ctx context.Context, repo string) error {
 	issuesSince := p.lastIssuesSince(ctx, repo)
 
@@ -108,7 +108,7 @@ func (p *Poller) pollIssues(ctx context.Context, repo string) error {
 		if p.cfg.BotUsername != "" && issue.User.Login == p.cfg.BotUsername {
 			continue // never react to issues created by our own account
 		}
-		if !strings.Contains(issue.Body, p.cfg.Trigger) {
+		if !p.triggered(issue.Body) {
 			continue
 		}
 		if len(p.cfg.Users) > 0 && !contains(p.cfg.Users, issue.User.Login) {
@@ -150,12 +150,19 @@ func (p *Poller) saveIssuesSince(ctx context.Context, repo string, t time.Time) 
 	}
 }
 
+// triggered reports whether text begins with the trigger keyword, ignoring
+// leading whitespace. Requiring the keyword at the start (rather than anywhere
+// in the text) avoids false triggers from incidental mentions.
+func (p *Poller) triggered(text string) bool {
+	return strings.HasPrefix(strings.TrimSpace(text), p.cfg.Trigger)
+}
+
 // shouldTrigger applies the self/author/keyword filters.
 func (p *Poller) shouldTrigger(repo string, c github.Comment) bool {
 	if p.cfg.BotUsername != "" && c.User.Login == p.cfg.BotUsername {
 		return false // never react to our own comments
 	}
-	if !strings.Contains(c.Body, p.cfg.Trigger) {
+	if !p.triggered(c.Body) {
 		return false
 	}
 	if len(p.cfg.Users) > 0 && !contains(p.cfg.Users, c.User.Login) {

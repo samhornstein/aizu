@@ -1,10 +1,10 @@
 # Aizu
 
-Aizu lets you control your local coding agents directly from GitHub. Mention `@aizu` in any issue or pull request and your agent handles it — running on your own machine, with your own models.
+Aizu lets you control your local coding agents directly from GitHub. Mention `aizu` in any issue or pull request and your agent handles it — running on your own machine, with your own models.
 
 ```
-@aizu fix the failing test in parser_test.go
-@aizu add input validation to the signup handler
+aizu implement this ticket
+aizu review this pull request
 ```
 
 ## Quickstart
@@ -30,20 +30,14 @@ Then from the bot account, generate a [classic token](https://github.com/setting
 
 ```bash
 git clone https://github.com/samhornstein/aizu.git && cd aizu
-cp .env.example .env
 ```
 
-Edit `.env` and add the bot account's token:
+Create a `.env` with your bot token and the repositories to watch (see
+`.env.example` for all options):
 
 ```env
 GITHUB_TOKEN=ghp_YOUR_BOT_TOKEN_HERE
-```
-
-Edit `aizu.toml` to set the repositories Aizu should watch (required):
-
-```toml
-[trigger]
-repos = ["owner/repo"]
+AIZU_REPOS=owner/repo
 ```
 
 ### 3. Start a local model
@@ -64,11 +58,14 @@ OPENAI_BASE_URL=http://host.docker.internal:8080/v1
 
 ### 4. Start
 
+Build the agent sandbox image (first run only), then start Aizu:
+
 ```bash
+docker compose build agent
 docker compose up -d
 ```
 
-Aizu begins polling for `@aizu` mentions immediately. Follow along with:
+Aizu begins polling immediately. Follow along with:
 
 ```bash
 docker compose logs -f aizu
@@ -79,7 +76,7 @@ docker compose logs -f aizu
 From your **personal** account, comment on any issue in a watched repo:
 
 ```
-@aizu hello
+aizu hello
 ```
 
 Within one polling interval (15 seconds by default) Aizu reacts with 👀, runs the agent, and posts the result as a reply.

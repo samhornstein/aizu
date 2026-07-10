@@ -28,11 +28,12 @@ install-hooks:
 	ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
 	ln -sf ../../.githooks/commit-msg .git/hooks/commit-msg
 
-# Build the agent container image referenced by aizu.toml ([agent].image).
+# Build the agent sandbox image (aizu-agent:pi) the worker runs agents in.
 build-agent:
-	docker build -t aizu-agent:pi -f templates/pi/Dockerfile .
+	docker compose build agent
 
-up:
+# Build the agent image, then start Aizu + Redis.
+up: build-agent
 	docker compose up -d
 
 down:

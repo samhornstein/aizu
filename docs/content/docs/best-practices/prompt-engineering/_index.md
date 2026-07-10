@@ -10,11 +10,11 @@ The agent receives your comment as-is, so be specific and actionable.
 ## Good prompts
 
 ```
-@aizu fix the null pointer in parseConfig() in config/parser.go
+aizu fix the null pointer in parseConfig() in config/parser.go
 ```
 
 ```
-@aizu add input validation to the signup handler.
+aizu add input validation to the signup handler.
 Reject emails without an @ symbol and passwords shorter than 8 characters.
 Add tests for both cases.
 ```
@@ -22,11 +22,11 @@ Add tests for both cases.
 ## Bad prompts
 
 ```
-@aizu fix the bugs        # too vague — which file? what bugs?
+aizu fix the bugs        # too vague — which file? what bugs?
 ```
 
 ```
-@aizu refactor the codebase to use error wrapping   # too broad — will timeout
+aizu refactor the codebase to use error wrapping   # too broad — will timeout
 ```
 
 ## Tips

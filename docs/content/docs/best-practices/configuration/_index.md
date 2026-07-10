@@ -5,55 +5,44 @@ weight: 4
 
 # Configuration
 
+Aizu is configured entirely through environment variables, set in `.env`. The
+[`.env.example`](https://github.com/samhornstein/aizu/blob/main/.env.example)
+file is the complete reference — every setting, its format, and its default.
+Only `GITHUB_TOKEN`, `AIZU_REPOS`, and one model credential are required.
+
+This page covers the settings that involve a trade-off worth understanding.
+
 ## Trigger
 
-```toml
-[trigger]
-keyword = "aizu"
-repos = ["org/repo1", "org/repo2"]
-users = ["alice"]      # empty = allow all users
-```
-
-- **List repos explicitly** — empty `repos` picks up all repos the token can
-  access.
-- **Restrict users** in shared orgs to prevent accidental triggers.
+- **`AIZU_REPOS`** — the repos to watch (`owner/repo`, comma-separated). Left
+  empty, Aizu picks up every repo the token can access, which is rarely what you
+  want; list them explicitly.
+- **`AIZU_USERS`** — in shared orgs, restrict who can trigger Aizu to avoid
+  accidental or unwanted runs. Empty allows everyone.
+- **`AIZU_TRIGGER`** — the keyword must appear at the **start** of the comment or
+  issue body, so an incidental mention elsewhere in the text won't fire a run.
 
 ## Agent
 
-```toml
-[agent]
-timeout = 600   # seconds
-```
-
-- Default 600s works for most tasks. Reduce to 120–300s for simple fixes to
-  fail fast.
-- Keep `{prompt_file}` in your `command` string — it is replaced at runtime.
+- **`AIZU_TIMEOUT`** — defaults to a generous 1-hour limit for long agent runs;
+  lower it (e.g. 300–600s) to fail fast on simple tasks.
+- **`ENGINE_COMMAND`** — must keep the `{prompt_file}` placeholder, which is
+  replaced with the prompt's path at runtime.
+- **`CONTAINER_IMAGE`** — the sandbox image the agent runs in. Swap it (together
+  with `ENGINE_COMMAND`) to run a different coding agent.
 
 ## Poller
 
-```toml
-[poller]
-interval_seconds = 15
-```
-
-- 15s is fine for most setups. Increase to 60s+ with many repos to reduce
-  GitHub API usage (5,000 requests/hour limit).
+- **`POLL_INTERVAL`** — 15s suits most setups. Increase to 60s+ when watching
+  many repos to stay well under GitHub's API rate limit (5,000 requests/hour).
 
 ## Queue
 
-- **Use persistent Redis in production.** The default Docker Compose setup is
-  ephemeral — tasks are lost on restart. Add a volume:
+- **Redis is persistent by default** — the Compose setup mounts a `redis-data`
+  volume, so queued tasks survive restarts. Set **`REDIS_URL`** to point at an
+  external or hosted Redis.
 
-```yaml
-services:
-  redis:
-    volumes:
-      - redis-data:/data
-volumes:
-  redis-data:
-```
+## Secrets
 
-## Overrides
-
-All `aizu.toml` settings can be overridden via environment variables (e.g.
-`AIZU_TIMEOUT`, `POLL_INTERVAL`, `AIZU_REPOS`). Secrets are environment-only.
+`GITHUB_TOKEN` and model credentials are environment-only — keep them in `.env`
+(which is gitignored), never committed to the repo.

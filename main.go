@@ -1,6 +1,3 @@
-// Command aizu is a self-hosted GitHub agent. It polls a repository's issue and
-// pull-request comments for a trigger keyword (default "@aizu") and runs an
-// isolated coding agent for each mention, posting the result back as a comment.
 package main
 
 import (
@@ -47,7 +44,7 @@ func main() {
 	cfg := config.Load()
 
 	if (mode == "all" || mode == "poller") && len(cfg.Repos) == 0 {
-		fmt.Fprintf(os.Stderr, "Error: no repos configured. Set [trigger].repos in aizu.toml or AIZU_REPOS env var.\n")
+		fmt.Fprintf(os.Stderr, "Error: no repos configured. Set AIZU_REPOS (comma-separated owner/repo).\n")
 		os.Exit(1)
 	}
 

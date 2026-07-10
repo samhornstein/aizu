@@ -6,14 +6,14 @@ weight: 1
 # Overview
 
 Aizu is a self-hosted service that connects your GitHub repositories to a coding
-agent. When someone mentions the trigger keyword (`@aizu` by default) in an
+agent. When someone mentions the trigger keyword (`aizu` by default) in an
 issue or pull-request comment, Aizu runs an agent in an isolated sandbox to act
 on the request, then replies on the thread.
 
 ```
-@aizu fix the failing test in parser_test.go
-@aizu add input validation to the signup handler
-@aizu why is this function allocating on every call?
+aizu fix the failing test in parser_test.go
+aizu add input validation to the signup handler
+aizu why is this function allocating on every call?
 ```
 
 ## How it works

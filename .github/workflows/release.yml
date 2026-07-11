@@ -100,7 +100,7 @@ jobs:
             ghcr.io/samhornstein/aizu:latest
             ghcr.io/samhornstein/aizu:${{ steps.ver.outputs.next }}
 
-      - name: Publish agent image
+      - name: Publish agent image (pi)
         uses: docker/build-push-action@v6
         with:
           context: ./templates/pi
@@ -109,3 +109,13 @@ jobs:
           tags: |
             ghcr.io/samhornstein/aizu-agent-pi:latest
             ghcr.io/samhornstein/aizu-agent-pi:${{ steps.ver.outputs.next }}
+
+      - name: Publish agent image (claude)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./templates/claude
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/samhornstein/aizu-agent-claude:latest
+            ghcr.io/samhornstein/aizu-agent-claude:${{ steps.ver.outputs.next }}

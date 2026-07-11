@@ -83,6 +83,17 @@ Within one polling interval (15 seconds by default) Aizu reacts with 👀, runs 
 
 > **Note:** With a small local model the reply may be incoherent or raw JSON — that's expected. The goal here is just to confirm the pipeline works end-to-end. For real tasks, use a larger model or an API key.
 
+## Choosing your agent
+
+Aizu runs the [pi](https://github.com/earendil-works/pi) coding agent by default — it works with local models and API keys alike. To use Claude Code instead, set in `.env`:
+
+```env
+AIZU_ENGINE=claude
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+The right sandbox image is pulled automatically. For any other agent, set `CONTAINER_IMAGE` and `ENGINE_COMMAND` directly (they override the preset).
+
 ## Give Aizu its own identity (optional)
 
 By default Aizu posts replies as whoever owns the token. If you'd rather have replies attributed to a separate account, create one at [github.com/join](https://github.com/join) using `yourname+aizu@gmail.com` as the email and `yourname-aizu` as the username — GitHub treats the `+` address as separate but it lands in your existing inbox. Generate the classic token from that account instead.
@@ -95,7 +106,7 @@ Contributors (or anyone who wants to run exactly what's in the tree):
 
 ```bash
 git clone https://github.com/samhornstein/aizu.git && cd aizu
-docker compose build agent   # local agent sandbox image
+make build-agent             # local agent sandbox image (ENGINE=claude for Claude Code)
 docker compose up -d --build
 ```
 

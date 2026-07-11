@@ -40,7 +40,6 @@ its README index row in the same PR."*
 
 | Plan | Category | Severity / Value | Branch |
 |------|----------|------------------|--------|
-| [feat-engine-presets.md](feat-engine-presets.md) | Feature | Medium — `AIZU_ENGINE=claude\|aider\|opencode` presets | `feat/engine-presets` |
 | [feat-worker-concurrency.md](feat-worker-concurrency.md) | Feature | Medium — run multiple agent tasks in parallel | `feat/worker-concurrency` |
 | [chore-code-quality.md](chore-code-quality.md) | Quality | Low — small cleanups and missing queue tests | `chore/code-quality` |
 

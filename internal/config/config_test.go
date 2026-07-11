@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -54,6 +55,56 @@ func TestDefaults(t *testing.T) {
 	}
 	if cfg.PollInterval != 15*time.Second {
 		t.Errorf("PollInterval = %v, want 15s", cfg.PollInterval)
+	}
+}
+
+func TestEngineDefaultIsPi(t *testing.T) {
+	cfg := Load()
+	if cfg.Engine != "pi" {
+		t.Errorf("Engine = %q, want pi", cfg.Engine)
+	}
+	if cfg.EngineLocalCommand == "" {
+		t.Error("pi preset should carry a local-command variant")
+	}
+}
+
+func TestEnginePresetClaude(t *testing.T) {
+	t.Setenv("AIZU_ENGINE", "claude")
+	cfg := Load()
+	if cfg.Engine != "claude" {
+		t.Errorf("Engine = %q, want claude", cfg.Engine)
+	}
+	if cfg.ContainerImage != "ghcr.io/samhornstein/aizu-agent-claude:latest" {
+		t.Errorf("ContainerImage = %q, want the claude ghcr image", cfg.ContainerImage)
+	}
+	if !strings.Contains(cfg.EngineCommand, "claude") {
+		t.Errorf("EngineCommand = %q, want the claude command", cfg.EngineCommand)
+	}
+	if cfg.EngineLocalCommand != "" {
+		t.Errorf("EngineLocalCommand = %q, want empty (claude has no local variant)", cfg.EngineLocalCommand)
+	}
+}
+
+func TestEngineUnknownFallsBackToPi(t *testing.T) {
+	t.Setenv("AIZU_ENGINE", "notreal")
+	cfg := Load()
+	if cfg.Engine != "pi" {
+		t.Errorf("Engine = %q, want pi fallback", cfg.Engine)
+	}
+	if cfg.ContainerImage != "ghcr.io/samhornstein/aizu-agent-pi:latest" {
+		t.Errorf("ContainerImage = %q, want the pi image", cfg.ContainerImage)
+	}
+}
+
+func TestEngineCommandOverridesPreset(t *testing.T) {
+	t.Setenv("AIZU_ENGINE", "claude")
+	t.Setenv("ENGINE_COMMAND", "my-agent {prompt_file}")
+	cfg := Load()
+	if cfg.EngineCommand != "my-agent {prompt_file}" {
+		t.Errorf("EngineCommand = %q, want the explicit override", cfg.EngineCommand)
+	}
+	if cfg.EngineLocalCommand != "" {
+		t.Error("explicit ENGINE_COMMAND must clear the preset's local variant")
 	}
 }
 

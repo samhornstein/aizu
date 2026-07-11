@@ -46,7 +46,7 @@ server, not Aizu. To scale:
 
 ```bash
 git pull origin main
-docker compose build agent      # rebuild the agent sandbox if its Dockerfile changed
+make build-agent                # rebuild the agent sandbox if its Dockerfile changed
 docker compose up -d --build
 ```
 

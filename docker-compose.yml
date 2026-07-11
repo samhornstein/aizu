@@ -26,9 +26,10 @@ services:
       # localhost default won't work here. Override via REDIS_URL in .env for a
       # hosted/external Redis.
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      # Source builds use the locally built agent image (docker compose build
-      # agent), not the published ghcr.io default.
-      - CONTAINER_IMAGE=${CONTAINER_IMAGE:-aizu-agent:pi}
+      # Source builds use the locally built agent image (make build-agent),
+      # not the published ghcr.io default. Tracks AIZU_ENGINE so presets
+      # work in dev too.
+      - CONTAINER_IMAGE=${CONTAINER_IMAGE:-aizu-agent:${AIZU_ENGINE:-pi}}
     # host.docker.internal is built in on Docker Desktop but not on Linux;
     # this makes it resolve everywhere so local model servers on the host
     # (Ollama, llama.cpp, LM Studio) are reachable.
@@ -39,17 +40,22 @@ services:
     networks:
       - aizu-net
 
-  # Agent sandbox image. NOT a long-running service — the aizu worker launches a
-  # container from it on demand via the host Docker daemon. It lives here, behind
-  # the "agent" profile so `docker compose up` never starts it, purely so Compose
-  # builds it from source alongside the app:
-  #   docker compose build agent
-  # The tag names the engine (pi). To use a different agent, add
-  # templates/<engine>/Dockerfile, point this build/image at it, and set
-  # CONTAINER_IMAGE + ENGINE_COMMAND accordingly.
-  agent:
+  # Agent sandbox images, one per engine (AIZU_ENGINE). NOT long-running
+  # services — the aizu worker launches containers from them on demand via
+  # the host Docker daemon. They live here, behind the "agent" profile so
+  # `docker compose up` never starts them, purely so Compose builds them from
+  # source alongside the app:
+  #   make build-agent              # builds agent-pi (or ENGINE=claude …)
+  # To add an engine, create templates/<engine>/Dockerfile, mirror a service
+  # below, and add a preset (or set CONTAINER_IMAGE + ENGINE_COMMAND).
+  agent-pi:
     build: ./templates/pi
     image: aizu-agent:pi
+    profiles: ["agent"]
+
+  agent-claude:
+    build: ./templates/claude
+    image: aizu-agent:claude
     profiles: ["agent"]
 
 volumes:

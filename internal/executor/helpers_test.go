@@ -97,41 +97,66 @@ func TestShellQuoteRoundTrip(t *testing.T) {
 	}
 }
 
-func TestEnvExportsAlwaysIncludesGitIdentity(t *testing.T) {
+func TestRunWithStdin(t *testing.T) {
+	out, err := runWithStdin("cat", "hello", time.Second)
+	if err != nil {
+		t.Fatalf("runWithStdin() error = %v", err)
+	}
+	if out != "hello" {
+		t.Errorf("runWithStdin() output = %q, want %q", out, "hello")
+	}
+}
+
+func TestBuildEnvFileAlwaysIncludesGitIdentity(t *testing.T) {
 	cfg := &config.Config{}
-	out := envExports(cfg)
+	out := buildEnvFile(cfg)
 	for _, want := range []string{
-		"GIT_AUTHOR_NAME=aizu",
-		"GIT_AUTHOR_EMAIL=aizu@noreply",
-		"GIT_COMMITTER_NAME=aizu",
-		"GIT_COMMITTER_EMAIL=aizu@noreply",
+		"GIT_AUTHOR_NAME=aizu\n",
+		"GIT_AUTHOR_EMAIL=aizu@noreply\n",
+		"GIT_COMMITTER_NAME=aizu\n",
+		"GIT_COMMITTER_EMAIL=aizu@noreply\n",
 	} {
 		if !strings.Contains(out, want) {
-			t.Errorf("envExports missing %q; got: %s", want, out)
+			t.Errorf("buildEnvFile missing %q; got: %s", want, out)
 		}
 	}
 }
 
-func TestEnvExportsIncludesSetKeys(t *testing.T) {
+func TestBuildEnvFileIncludesSetKeys(t *testing.T) {
 	cfg := &config.Config{
 		AnthropicKey: "sk-ant",
 		OpenAIKey:    "sk-oai",
 		GitHubToken:  "ghp_test",
 	}
-	out := envExports(cfg)
-	for _, want := range []string{"ANTHROPIC_API_KEY=", "OPENAI_API_KEY=", "GITHUB_TOKEN=", "GH_TOKEN="} {
+	out := buildEnvFile(cfg)
+	for _, want := range []string{
+		"ANTHROPIC_API_KEY=sk-ant\n",
+		"OPENAI_API_KEY=sk-oai\n",
+		"GITHUB_TOKEN=ghp_test\n",
+		"GH_TOKEN=ghp_test\n",
+	} {
 		if !strings.Contains(out, want) {
-			t.Errorf("envExports missing %q; got: %s", want, out)
+			t.Errorf("buildEnvFile missing %q; got: %s", want, out)
 		}
 	}
 }
 
-func TestEnvExportsOmitsEmptyKeys(t *testing.T) {
+func TestBuildEnvFileOmitsEmptyKeys(t *testing.T) {
 	cfg := &config.Config{} // all keys empty
-	out := envExports(cfg)
-	for _, absent := range []string{"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GITHUB_TOKEN", "GH_TOKEN", "MODEL_SERVER_HOST"} {
+	out := buildEnvFile(cfg)
+	for _, absent := range []string{"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GITHUB_TOKEN", "GH_TOKEN"} {
 		if strings.Contains(out, absent) {
-			t.Errorf("envExports should omit unset key %q; got: %s", absent, out)
+			t.Errorf("buildEnvFile should omit unset key %q; got: %s", absent, out)
 		}
+	}
+}
+
+func TestBuildEnvFileSkipsNewlineValues(t *testing.T) {
+	// The env-file format has no quoting; a value with a newline would smuggle
+	// in an arbitrary extra variable.
+	cfg := &config.Config{OpenAIKey: "bad\nGIT_AUTHOR_NAME=evil"}
+	out := buildEnvFile(cfg)
+	if strings.Contains(out, "OPENAI_API_KEY") || strings.Contains(out, "evil") {
+		t.Errorf("buildEnvFile must skip values containing newlines; got: %s", out)
 	}
 }

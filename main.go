@@ -102,7 +102,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			slog.Info("Worker started")
-			worker.New(q, exec, gh, loader).Run(ctx)
+			worker.New(q, exec, gh, loader, cfg).Run(ctx)
 		}()
 	}
 

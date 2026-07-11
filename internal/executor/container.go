@@ -20,26 +20,36 @@ type containerExecutor struct {
 	cfg *config.Config
 }
 
+// credentialHelper authenticates git against GitHub using the GITHUB_TOKEN
+// env var present inside the container, so no URL or config file carries the
+// token itself.
+const credentialHelper = `!f() { echo username=x-access-token; echo password=$GITHUB_TOKEN; }; f`
+
 func (e *containerExecutor) Create(repo, branch string, prNumber int) (string, error) {
 	sid := "aizu-" + uuid.New().String()[:8]
 
 	// --add-host makes host.docker.internal resolve on Linux too (it is
 	// built in on Docker Desktop), so the agent can reach model servers
-	// running on the host.
-	create := fmt.Sprintf("docker run -d --name=%s --label=aizu=true --add-host=host.docker.internal:host-gateway --memory=4g --cpus=2 %s sleep infinity",
+	// running on the host. Secrets travel as container env via stdin
+	// (--env-file /dev/stdin) so they never appear in host argv.
+	create := fmt.Sprintf("docker run -d --name=%s --label=aizu=true --add-host=host.docker.internal:host-gateway --memory=4g --cpus=2 --env-file /dev/stdin %s sleep infinity",
 		shellQuote(sid), shellQuote(e.cfg.ContainerImage))
-	if _, err := run(create, 0); err != nil {
+	if _, err := runWithStdin(create, buildEnvFile(e.cfg), 0); err != nil {
 		return "", fmt.Errorf("docker run: %w", err)
 	}
 
+	// Authenticate git through a credential helper reading GITHUB_TOKEN from
+	// the container env, instead of a token-in-URL — keeps the token out of
+	// host argv and out of .git/config.
 	cloneURL := fmt.Sprintf("https://github.com/%s.git", repo)
-	if e.cfg.GitHubToken != "" {
-		cloneURL = fmt.Sprintf("https://x-access-token:%s@github.com/%s.git", e.cfg.GitHubToken, repo)
-	}
-	if _, err := e.exec(sid, fmt.Sprintf("git clone %s /workspace/repo", shellQuote(cloneURL)), 0); err != nil {
+	clone := fmt.Sprintf("git -c credential.helper=%s clone %s /workspace/repo",
+		shellQuote(credentialHelper), shellQuote(cloneURL))
+	if _, err := e.exec(sid, clone, 0); err != nil {
 		return "", fmt.Errorf("git clone: %w", err)
 	}
-	if _, err := e.exec(sid, "cd /workspace/repo && git config user.name aizu && git config user.email aizu@noreply", 0); err != nil {
+	config := fmt.Sprintf("cd /workspace/repo && git config user.name aizu && git config user.email aizu@noreply && git config credential.helper %s",
+		shellQuote(credentialHelper))
+	if _, err := e.exec(sid, config, 0); err != nil {
 		return "", fmt.Errorf("git config: %w", err)
 	}
 	if prNumber > 0 {
@@ -144,10 +154,9 @@ func (e *containerExecutor) RunEngine(sid, prompt string) (int, string, error) {
 			command = strings.Replace(command, "pi ", "pi --model "+shellQuote(modelID)+" ", 1)
 		}
 	}
+	// Credentials and git identity are container env (set at docker run);
+	// nothing to export here.
 	full := fmt.Sprintf("cd /workspace/repo && %s", command)
-	if prefix := envExports(e.cfg); prefix != "" {
-		full = prefix + " && " + full
-	}
 	slog.Info("Running engine in container", "sid", sid)
 
 	output, err := e.exec(sid, full, time.Duration(e.cfg.Timeout)*time.Second)

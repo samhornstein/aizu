@@ -20,6 +20,13 @@ var errTimedOut = errors.New("command timed out")
 // run executes a shell command on the host. If timeout > 0 the command is
 // killed when it elapses and the returned error wraps errTimedOut.
 func run(cmd string, timeout time.Duration) (string, error) {
+	return runWithStdin(cmd, "", timeout)
+}
+
+// runWithStdin is run with the command's stdin fed from a string — the
+// channel for anything secret, which must never appear in argv (visible in
+// the host process table).
+func runWithStdin(cmd, stdin string, timeout time.Duration) (string, error) {
 	slog.Debug("exec", "cmd", cmd)
 	ctx := context.Background()
 	if timeout > 0 {
@@ -28,6 +35,9 @@ func run(cmd string, timeout time.Duration) (string, error) {
 		defer cancel()
 	}
 	c := exec.CommandContext(ctx, "sh", "-c", cmd)
+	if stdin != "" {
+		c.Stdin = strings.NewReader(stdin)
+	}
 	// Without WaitDelay, CombinedOutput blocks until every process holding
 	// the output pipe exits — a grandchild of sh can outlive the kill and
 	// stall the timeout for the child's full duration.
@@ -52,27 +62,30 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"
 }
 
-// envExports builds the `export ...` prefix passed to the engine: a fixed git
-// identity plus any model credentials that are set.
-func envExports(cfg *config.Config) string {
-	exports := []string{
-		"export GIT_AUTHOR_NAME=aizu",
-		"export GIT_AUTHOR_EMAIL=aizu@noreply",
-		"export GIT_COMMITTER_NAME=aizu",
-		"export GIT_COMMITTER_EMAIL=aizu@noreply",
-	}
-	for key, val := range map[string]string{
-		"ANTHROPIC_API_KEY": cfg.AnthropicKey,
-		"OPENAI_API_KEY":    cfg.OpenAIKey,
+// buildEnvFile renders the sandbox environment as KEY=value lines for
+// `docker run --env-file /dev/stdin`: a fixed git identity plus every
+// credential the agent needs. Delivered via stdin so secrets never appear in
+// host argv. The env-file format has no quoting, so values containing
+// newlines cannot be represented and are skipped.
+func buildEnvFile(cfg *config.Config) string {
+	vars := []struct{ key, val string }{
+		{"GIT_AUTHOR_NAME", "aizu"},
+		{"GIT_AUTHOR_EMAIL", "aizu@noreply"},
+		{"GIT_COMMITTER_NAME", "aizu"},
+		{"GIT_COMMITTER_EMAIL", "aizu@noreply"},
 		// gh reads GH_TOKEN first, then GITHUB_TOKEN; other tools read
-		// GITHUB_TOKEN — export both. The token is already readable from the
-		// clone's remote URL, so this adds no new exposure class.
-		"GITHUB_TOKEN": cfg.GitHubToken,
-		"GH_TOKEN":     cfg.GitHubToken,
-	} {
-		if val != "" {
-			exports = append(exports, fmt.Sprintf("export %s=%s", key, shellQuote(val)))
-		}
+		// GITHUB_TOKEN — export both.
+		{"GITHUB_TOKEN", cfg.GitHubToken},
+		{"GH_TOKEN", cfg.GitHubToken},
+		{"ANTHROPIC_API_KEY", cfg.AnthropicKey},
+		{"OPENAI_API_KEY", cfg.OpenAIKey},
 	}
-	return strings.Join(exports, " && ")
+	var b strings.Builder
+	for _, v := range vars {
+		if v.val == "" || strings.ContainsAny(v.val, "\n\r") {
+			continue
+		}
+		fmt.Fprintf(&b, "%s=%s\n", v.key, v.val)
+	}
+	return b.String()
 }

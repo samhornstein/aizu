@@ -52,6 +52,21 @@ func TestRunNoTimeout(t *testing.T) {
 	}
 }
 
+func TestSandboxURL(t *testing.T) {
+	cases := map[string]string{
+		"http://localhost:11434/v1":            "http://host.docker.internal:11434/v1",
+		"http://127.0.0.1:8080/v1":             "http://host.docker.internal:8080/v1",
+		"http://host.docker.internal:11434/v1": "http://host.docker.internal:11434/v1",
+		"https://api.example.com/v1":           "https://api.example.com/v1",
+		"":                                     "",
+	}
+	for in, want := range cases {
+		if got := sandboxURL(in); got != want {
+			t.Errorf("sandboxURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestShellQuote(t *testing.T) {
 	cases := []struct {
 		in   string

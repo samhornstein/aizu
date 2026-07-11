@@ -14,7 +14,7 @@ Get Aizu running and trigger your first agent.
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/)
-- [llama.cpp](https://github.com/ggml-org/llama.cpp#quick-start) — `brew install llama.cpp` on Mac
+- A local model server — [Ollama](https://ollama.com/download) is the easiest ([llama.cpp](https://github.com/ggml-org/llama.cpp#quick-start) and [LM Studio](https://lmstudio.ai/) also work), or skip it and use an API key
 
 ### 1. Create a GitHub token
 
@@ -36,17 +36,23 @@ AIZU_REPOS=owner/repo
 
 ### 3. Start a local model
 
-Run a model server. The `-hf` flag downloads the model automatically (~1 GB on first run):
+With [Ollama](https://ollama.com/download) installed, pull a model (Ollama's server runs automatically):
+
+```bash
+ollama pull qwen2.5-coder:1.5b
+```
+
+That's it — Aizu auto-detects a running Ollama, llama.cpp, or LM Studio server on its standard port at startup. Set `OPENAI_BASE_URL` in `.env` only for a non-standard port or remote host.
+
+<details>
+<summary>Using llama.cpp instead</summary>
 
 ```bash
 llama-server -hf bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M --port 8080
 ```
 
-Then in `.env`, uncomment:
-
-```env
-OPENAI_BASE_URL=http://host.docker.internal:8080/v1
-```
+The `-hf` flag downloads the model automatically (~1 GB on first run).
+</details>
 
 > **Using an API key instead?** Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in `.env` and skip this step.
 

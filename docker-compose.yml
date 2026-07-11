@@ -26,6 +26,11 @@ services:
       # localhost default won't work here. Override via REDIS_URL in .env for a
       # hosted/external Redis.
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    # host.docker.internal is built in on Docker Desktop but not on Linux;
+    # this makes it resolve everywhere so local model servers on the host
+    # (Ollama, llama.cpp, LM Studio) are reachable.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - redis
     networks:

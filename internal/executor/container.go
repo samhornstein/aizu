@@ -23,7 +23,10 @@ type containerExecutor struct {
 func (e *containerExecutor) Create(repo, branch string) (string, error) {
 	sid := "aizu-" + uuid.New().String()[:8]
 
-	create := fmt.Sprintf("docker run -d --name=%s --label=aizu=true --memory=4g --cpus=2 %s sleep infinity",
+	// --add-host makes host.docker.internal resolve on Linux too (it is
+	// built in on Docker Desktop), so the agent can reach model servers
+	// running on the host.
+	create := fmt.Sprintf("docker run -d --name=%s --label=aizu=true --add-host=host.docker.internal:host-gateway --memory=4g --cpus=2 %s sleep infinity",
 		shellQuote(sid), shellQuote(e.cfg.ContainerImage))
 	if _, err := run(create, 0); err != nil {
 		return "", fmt.Errorf("docker run: %w", err)
@@ -78,7 +81,7 @@ func (e *containerExecutor) writeModelsJSON(sid string) error {
 	payload := map[string]interface{}{
 		"providers": map[string]provider{
 			"local": {
-				BaseURL: e.cfg.OpenAIBaseURL,
+				BaseURL: sandboxURL(e.cfg.OpenAIBaseURL),
 				API:     "openai-completions",
 				APIKey:  "local",
 				Compat:  compat{SupportsDeveloperRole: false, SupportsReasoningEffort: false},

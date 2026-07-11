@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alicebob/miniredis/v2"
+	"github.com/samhornstein/aizu/internal/config"
 	"github.com/samhornstein/aizu/internal/github"
 	"github.com/samhornstein/aizu/internal/queue"
 	"github.com/samhornstein/aizu/internal/template"
@@ -19,6 +21,8 @@ import (
 type mockExecutor struct {
 	fileContent string
 	fileErr     error
+	engineExit  int
+	engineOut   string
 
 	// Recorded by Create/RunEngine for assertions.
 	gotBranch   string
@@ -33,7 +37,7 @@ func (m *mockExecutor) Create(repo, branch string, prNumber int) (string, error)
 }
 func (m *mockExecutor) RunEngine(sid, prompt string) (int, string, error) {
 	m.gotPrompt = prompt
-	return 0, "", nil
+	return m.engineExit, m.engineOut, nil
 }
 func (m *mockExecutor) ReadFile(sid, path string) (string, error) {
 	return m.fileContent, m.fileErr
@@ -223,6 +227,72 @@ func TestHandleThreadsPRNumber(t *testing.T) {
 			hasNote := strings.Contains(exec.gotPrompt, "comes from a fork")
 			if hasNote != tc.wantForkNote {
 				t.Errorf("fork note present = %v, want %v", hasNote, tc.wantForkNote)
+			}
+		})
+	}
+}
+
+func TestRedact(t *testing.T) {
+	got := redact("token ghp_abc and key sk-x", "ghp_abc", "", "sk-x")
+	if got != "token [redacted] and key [redacted]" {
+		t.Errorf("redact() = %q", got)
+	}
+	if redact("clean text") != "clean text" {
+		t.Error("redact with no secrets must be a no-op")
+	}
+}
+
+// TestProcessRedactsSecrets runs process() end to end (miniredis + fake
+// GitHub) and asserts the posted comment never contains a configured secret —
+// on the success path and on the engine-failure path.
+func TestProcessRedactsSecrets(t *testing.T) {
+	const token = "ghp_supersecret"
+	cases := []struct {
+		name     string
+		exitCode int
+	}{
+		{"success path", 0},
+		{"engine failure path", 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var posted string
+			mux := http.NewServeMux()
+			mux.HandleFunc("/repos/o/r/issues/9", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]any{"number": 9, "title": "T"})
+			})
+			mux.HandleFunc("/repos/o/r/issues/9/comments", func(w http.ResponseWriter, r *http.Request) {
+				var payload map[string]string
+				_ = json.NewDecoder(r.Body).Decode(&payload)
+				posted = payload["body"]
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte("{}"))
+			})
+			srv := httptest.NewServer(mux)
+			defer srv.Close()
+
+			mr := miniredis.RunT(t)
+			w := New(
+				queue.New("redis://"+mr.Addr()),
+				&mockExecutor{fileErr: errors.New("no file"), engineExit: tc.exitCode, engineOut: "leaked: " + token},
+				github.NewWithBaseURL("t", srv.URL),
+				template.NewLoader("sys"),
+				&config.Config{GitHubToken: token},
+			)
+			// Retries exhausted so the failure path posts instead of re-queueing.
+			task := &queue.Task{ID: "t1", Repo: "o/r", Number: 9, CommentID: 0, Author: "alice", Body: "@aizu", Retries: 1}
+
+			w.process(context.Background(), task)
+
+			if posted == "" {
+				t.Fatal("no comment was posted")
+			}
+			if strings.Contains(posted, token) {
+				t.Fatalf("posted comment contains the token: %s", posted)
+			}
+			if !strings.Contains(posted, "[redacted]") {
+				t.Errorf("posted comment should carry the redaction marker; got: %s", posted)
 			}
 		})
 	}

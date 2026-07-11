@@ -124,7 +124,7 @@ func TestPipeline(t *testing.T) {
 	defer cancel()
 
 	go poller.New(cfg, gh, q).Run(ctx)
-	go worker.New(q, &mockExec{}, gh, template.NewLoader("be helpful")).Run(ctx)
+	go worker.New(q, &mockExec{}, gh, template.NewLoader("be helpful"), cfg).Run(ctx)
 
 	select {
 	case reply := <-replyCh:

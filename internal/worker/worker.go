@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/samhornstein/aizu/internal/config"
 	"github.com/samhornstein/aizu/internal/executor"
 	"github.com/samhornstein/aizu/internal/github"
 	"github.com/samhornstein/aizu/internal/queue"
@@ -22,11 +23,21 @@ type Worker struct {
 	exec   executor.Executor
 	gh     *github.Client
 	loader *template.Loader
+
+	// secrets are masked in everything posted publicly; the agent has them
+	// in its sandbox and engine output may echo them.
+	secrets []string
 }
 
 // New constructs a Worker.
-func New(q *queue.Queue, exec executor.Executor, gh *github.Client, loader *template.Loader) *Worker {
-	return &Worker{q: q, exec: exec, gh: gh, loader: loader}
+func New(q *queue.Queue, exec executor.Executor, gh *github.Client, loader *template.Loader, cfg *config.Config) *Worker {
+	return &Worker{
+		q:       q,
+		exec:    exec,
+		gh:      gh,
+		loader:  loader,
+		secrets: []string{cfg.GitHubToken, cfg.AnthropicKey, cfg.OpenAIKey},
+	}
 }
 
 // Run loops until ctx is cancelled, processing tasks as they arrive.
@@ -146,10 +157,22 @@ func (w *Worker) buildPrompt(sid string, issue *github.Issue, task *queue.Task, 
 	return b.String()
 }
 
+// reply is the single choke point through which success and failure comments
+// flow; everything posted publicly is redacted here.
 func (w *Worker) reply(ctx context.Context, task *queue.Task, body string, log *slog.Logger) {
-	if err := w.gh.CreateComment(ctx, task.Repo, task.Number, body); err != nil {
+	if err := w.gh.CreateComment(ctx, task.Repo, task.Number, redact(body, w.secrets...)); err != nil {
 		log.Warn("Could not post reply", "error", err)
 	}
+}
+
+// redact masks configured secrets in text before it is posted publicly.
+func redact(text string, secrets ...string) string {
+	for _, s := range secrets {
+		if s != "" {
+			text = strings.ReplaceAll(text, s, "[redacted]")
+		}
+	}
+	return text
 }
 
 func formatResult(output string) string {

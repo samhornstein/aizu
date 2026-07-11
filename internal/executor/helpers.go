@@ -64,6 +64,11 @@ func envExports(cfg *config.Config) string {
 	for key, val := range map[string]string{
 		"ANTHROPIC_API_KEY": cfg.AnthropicKey,
 		"OPENAI_API_KEY":    cfg.OpenAIKey,
+		// gh reads GH_TOKEN first, then GITHUB_TOKEN; other tools read
+		// GITHUB_TOKEN — export both. The token is already readable from the
+		// clone's remote URL, so this adds no new exposure class.
+		"GITHUB_TOKEN": cfg.GitHubToken,
+		"GH_TOKEN":     cfg.GitHubToken,
 	} {
 		if val != "" {
 			exports = append(exports, fmt.Sprintf("export %s=%s", key, shellQuote(val)))

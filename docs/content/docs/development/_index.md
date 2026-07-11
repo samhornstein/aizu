@@ -47,8 +47,9 @@ make build
 ./bin/aizu worker   # dequeue tasks and run the agent
 ```
 
-`docker compose up` (via `make up`) builds Aizu from your working tree — there
-is no prebuilt image to pull. After changing code or config, rebuild with:
+`docker compose up` (via `make up`) builds Aizu from your working tree — the
+published ghcr.io images are only used by the no-clone install
+(`deploy/docker-compose.yml`). After changing code or config, rebuild with:
 
 ```bash
 docker compose up -d --build
@@ -91,10 +92,11 @@ To cut one, go to **Actions → Release → Run workflow** and leave *version* b
 changelog, and publishes a GitHub Release. Provide *version* explicitly (e.g.
 `v1.2.0`) only to override the computed value.
 
-No container images are published (installs build from source), so a release is
-a named, changelog-backed checkpoint rather than a downloadable artifact. To see
-which version a running instance was built from, run `git describe --tags` in
-its clone.
+Each release also publishes multi-arch images to ghcr.io
+(`ghcr.io/samhornstein/aizu` and `ghcr.io/samhornstein/aizu-agent-pi`, tagged
+`latest` and the version) — these are what the no-clone install pulls. Source
+builds are unaffected; `git describe --tags` in a clone shows what a
+source-built instance runs.
 
 ## Docs
 

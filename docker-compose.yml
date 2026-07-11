@@ -26,6 +26,9 @@ services:
       # localhost default won't work here. Override via REDIS_URL in .env for a
       # hosted/external Redis.
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      # Source builds use the locally built agent image (docker compose build
+      # agent), not the published ghcr.io default.
+      - CONTAINER_IMAGE=${CONTAINER_IMAGE:-aizu-agent:pi}
     # host.docker.internal is built in on Docker Desktop but not on Linux;
     # this makes it resolve everywhere so local model servers on the host
     # (Ollama, llama.cpp, LM Studio) are reachable.

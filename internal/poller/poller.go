@@ -7,6 +7,7 @@ package poller
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -19,6 +20,15 @@ import (
 
 const sincePrefix = "aizu:since:"
 const issuesSincePrefix = "aizu:issuesSince:"
+
+// Seen-markers record triggers that have already been enqueued, so neither
+// comment edits nor issue updates (including our own reply bumping the
+// issue's updated_at) can re-trigger the agent. The queue's queued/running
+// dedupe only guards while a task is active; these markers are what make a
+// trigger fire exactly once.
+const seenIssuePrefix = "aizu:seen:issue:"
+const seenCommentPrefix = "aizu:seen:comment:"
+const seenTTL = 30 * 24 * time.Hour
 
 // Poller polls GitHub and enqueues triggered comments.
 type Poller struct {
@@ -79,7 +89,13 @@ func (p *Poller) pollRepo(ctx context.Context, repo string) error {
 			slog.Warn("Could not parse issue number", "repo", repo, "issue_url", c.IssueURL)
 			continue
 		}
+		seenKey := fmt.Sprintf("%s%s#%d", seenCommentPrefix, repo, c.ID)
+		if p.alreadySeen(ctx, seenKey) {
+			continue // handled before; an edit to the comment must not re-run
+		}
 		if _, err := p.q.Enqueue(ctx, repo, number, c.ID, c.Body, c.User.Login); err != nil {
+			// Clear the marker so the next poll retries this trigger.
+			p.rdb.Del(ctx, seenKey)
 			slog.Error("Enqueue failed", "repo", repo, "number", number, "error", err)
 		}
 	}
@@ -115,17 +131,25 @@ func (p *Poller) pollIssues(ctx context.Context, repo string) error {
 			slog.Info("Ignoring issue from non-allowlisted user", "repo", repo, "user", issue.User.Login)
 			continue
 		}
+		seenKey := fmt.Sprintf("%s%s#%d", seenIssuePrefix, repo, issue.Number)
+		if p.alreadySeen(ctx, seenKey) {
+			continue // an issue body triggers exactly once; comment to re-run
+		}
 		// Enqueue with CommentID=0 to signal this was triggered by the issue body.
 		if _, err := p.q.Enqueue(ctx, repo, issue.Number, 0, p.cfg.Trigger, issue.User.Login); err != nil {
+			// Clear the marker so the next poll retries this trigger.
+			p.rdb.Del(ctx, seenKey)
 			slog.Error("Enqueue failed (issue body)", "repo", repo, "number", issue.Number, "error", err)
 		}
 	}
 
 	if len(issues) > 0 {
-		// Advance cursor to the latest issue's updated time so we don't
-		// re-process issues already seen.
+		// Advance the cursor just past the latest issue's updated time:
+		// GitHub's `since` is inclusive, so saving the exact timestamp would
+		// refetch the newest issue every poll. Correctness doesn't depend on
+		// this (the seen-markers do that); it only avoids refetch churn.
 		latest := issues[len(issues)-1].UpdatedAt
-		p.saveIssuesSince(ctx, repo, latest)
+		p.saveIssuesSince(ctx, repo, latest.Add(time.Second))
 	}
 
 	return nil
@@ -148,6 +172,18 @@ func (p *Poller) saveIssuesSince(ctx context.Context, repo string, t time.Time) 
 	if err := p.rdb.Set(ctx, issuesSincePrefix+repo, t.UTC().Format(time.RFC3339), 0).Err(); err != nil {
 		slog.Warn("Could not persist issues poll cursor", "repo", repo, "error", err)
 	}
+}
+
+// alreadySeen atomically records key if unseen and reports whether it was
+// already recorded. Redis errors fail open: the worst case is a duplicate
+// run, which beats silently dropping a trigger.
+func (p *Poller) alreadySeen(ctx context.Context, key string) bool {
+	ok, err := p.rdb.SetNX(ctx, key, "1", seenTTL).Result()
+	if err != nil {
+		slog.Warn("Could not check seen-marker; proceeding", "key", key, "error", err)
+		return false
+	}
+	return !ok
 }
 
 // triggered reports whether text begins with the trigger keyword, ignoring

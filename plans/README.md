@@ -43,7 +43,6 @@ The only pair safe to run in parallel is `bugfix-stale-running-set.md` and
 
 | Plan | Category | Severity / Value | Branch |
 |------|----------|------------------|--------|
-| [bugfix-issue-retrigger-loop.md](bugfix-issue-retrigger-loop.md) | Bug | **Critical** — issue-body triggers re-run the agent forever | `fix/issue-retrigger-loop` |
 | [bugfix-stale-running-set.md](bugfix-stale-running-set.md) | Bug | **High** — a crash mid-task permanently blocks an issue | `fix/stale-running-set` |
 | [bugfix-timeout-detection.md](bugfix-timeout-detection.md) | Bug | Medium — engine timeouts are misreported as generic failures | `fix/timeout-detection` |
 | [bugfix-fork-pr-checkout.md](bugfix-fork-pr-checkout.md) | Bug | Medium — PRs from forks fail at checkout | `fix/fork-pr-checkout` |

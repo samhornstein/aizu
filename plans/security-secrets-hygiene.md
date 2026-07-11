@@ -32,6 +32,14 @@ API-safe `--env-file /dev/stdin` mechanism, never argv), authenticate git
 with a credential helper instead of a token-in-URL, and redact known secrets
 from anything posted to GitHub.
 
+**Priority within this plan:** redaction (step 4) is the must-have — it is
+the only part that protects against *public* leakage and it is ~20 lines.
+The argv/credential-helper work (steps 1–3) protects against local `ps`
+snooping on the operator's own machine — real but lower stakes for a
+single-user tool. If steps 1–3 balloon in complexity during implementation
+(e.g. `--env-file /dev/stdin` misbehaves on some platform), ship step 4
+alone and file the rest as a follow-up rather than blocking on it.
+
 ### Steps
 
 1. **Add stdin support to `run`.** In `internal/executor/helpers.go`, add a

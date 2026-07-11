@@ -24,6 +24,13 @@ flags change. The commands below were correct as of mid-2026 — verify each
 against the tool's current docs before committing, and prefer pinning
 install versions.
 
+**Scope discipline:** ship this in two waves. Wave 1 = the mechanism plus
+**pi and claude only** (Claude Code is the most-requested preset and the
+easiest to verify). Aider and opencode are wave-2 follow-ups added on
+demand — an untested preset that breaks on first use is worse than no
+preset. The preset table below documents all four so wave 2 is trivial;
+wave 1 simply omits the last two entries and their templates.
+
 ## Approach
 
 ### Steps

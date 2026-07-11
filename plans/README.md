@@ -20,6 +20,7 @@ PR titles must follow Conventional Commits (enforced by `.github/workflows/pr-ti
 | [bugfix-fork-pr-checkout.md](bugfix-fork-pr-checkout.md) | Bug | Medium — PRs from forks fail at checkout | `fix/fork-pr-checkout` |
 | [feat-single-account-mode.md](feat-single-account-mode.md) | Quickstart | **High** — removes the "create a bot account" setup step | `feat/single-account-mode` |
 | [feat-ollama-autodetect.md](feat-ollama-autodetect.md) | Quickstart | High — Ollama support + zero-config local model discovery | `feat/local-model-autodetect` |
+| [feat-startup-selfcheck.md](feat-startup-selfcheck.md) | Quickstart | High — bad token/repo fails fast with instructions instead of log spam | `feat/startup-selfcheck` |
 | [feat-prebuilt-images.md](feat-prebuilt-images.md) | Quickstart | High — install via one compose file, no clone/build | `feat/prebuilt-images` |
 | [security-collaborator-gate.md](security-collaborator-gate.md) | Security | **High** — today anyone who can comment can trigger the agent | `fix/collaborator-gate` |
 | [feat-sandbox-github-api.md](feat-sandbox-github-api.md) | Agent capability | High — makes AIZU.md's progress updates actually possible | `feat/sandbox-github-api` |

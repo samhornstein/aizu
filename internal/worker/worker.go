@@ -23,6 +23,7 @@ type Worker struct {
 	exec   executor.Executor
 	gh     *github.Client
 	loader *template.Loader
+	cfg    *config.Config
 
 	// secrets are masked in everything posted publicly; the agent has them
 	// in its sandbox and engine output may echo them.
@@ -36,6 +37,7 @@ func New(q *queue.Queue, exec executor.Executor, gh *github.Client, loader *temp
 		exec:    exec,
 		gh:      gh,
 		loader:  loader,
+		cfg:     cfg,
 		secrets: []string{cfg.GitHubToken, cfg.AnthropicKey, cfg.OpenAIKey},
 	}
 }
@@ -62,25 +64,79 @@ func (w *Worker) process(ctx context.Context, task *queue.Task) {
 	log := slog.With("id", task.ID, "repo", task.Repo, "number", task.Number)
 	log.Info("Processing task")
 
-	// Only react to the comment if this was triggered by a comment.
-	// Issue-body triggers have CommentID=0.
-	if task.CommentID > 0 {
-		if err := w.gh.AddReaction(ctx, task.Repo, task.CommentID, "eyes"); err != nil {
-			log.Warn("Could not add reaction", "error", err)
+	w.react(ctx, task, "eyes", log)
+
+	// Help requests are answered by the worker itself — no sandbox, no
+	// model tokens. Only comment triggers qualify: an issue-body trigger's
+	// task body is just the trigger word (the real request is in the issue).
+	if task.CommentID > 0 && isHelpRequest(task.Body, w.cfg.Trigger) {
+		w.reply(ctx, task, 0, helpText(w.cfg.Trigger), log)
+		w.q.MarkDone(ctx, task)
+		return
+	}
+
+	if ok, n := w.q.AllowRun(ctx, task.Repo, w.cfg.MaxRunsPerHour); !ok {
+		// Reply exactly once per window — on the first excess trigger.
+		if n == int64(w.cfg.MaxRunsPerHour)+1 {
+			until := time.Now().UTC().Truncate(time.Hour).Add(time.Hour)
+			w.reply(ctx, task, 0, fmt.Sprintf("Aizu's rate limit for this repo is reached (%d runs/hour). Try again after %s UTC.",
+				w.cfg.MaxRunsPerHour, until.Format("15:04")), log)
 		}
+		log.Warn("Rate limit reached; dropping task", "count", n)
+		w.q.MarkDone(ctx, task)
+		return
+	}
+
+	// Instant acknowledgment in the thread; edited into the final result so
+	// there is exactly one outcome comment.
+	var placeholderID int64
+	if id, err := w.gh.CreateComment(ctx, task.Repo, task.Number, "⏳ Aizu is working on this…"); err != nil {
+		log.Warn("Could not post progress comment", "error", err)
+	} else {
+		placeholderID = id
 	}
 
 	output, err := w.handle(ctx, task, log)
 	if err != nil {
 		log.Error("Task failed", "error", err)
 		if !w.q.MarkFailed(ctx, task) {
-			w.reply(ctx, task, fmt.Sprintf("Aizu failed to process this request: %v", err), log)
+			w.reply(ctx, task, placeholderID, fmt.Sprintf("Aizu failed to process this request: %v", err), log)
+			w.react(ctx, task, "confused", log)
 		}
 		return
 	}
 
-	w.reply(ctx, task, output, log)
+	w.reply(ctx, task, placeholderID, output, log)
+	w.react(ctx, task, "rocket", log)
 	w.q.MarkDone(ctx, task)
+}
+
+// react adds a reaction to the triggering comment, if there is one
+// (issue-body triggers have CommentID=0).
+func (w *Worker) react(ctx context.Context, task *queue.Task, content string, log *slog.Logger) {
+	if task.CommentID == 0 {
+		return
+	}
+	if err := w.gh.AddReaction(ctx, task.Repo, task.CommentID, content); err != nil {
+		log.Warn("Could not add reaction", "content", content, "error", err)
+	}
+}
+
+// isHelpRequest reports whether body is the bare trigger word or the trigger
+// word followed only by "help".
+func isHelpRequest(body, trigger string) bool {
+	rest := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(body), trigger))
+	return rest == "" || strings.EqualFold(rest, "help")
+}
+
+func helpText(trigger string) string {
+	return fmt.Sprintf("**Aizu** runs a coding agent on this repository, on its operator's machine.\n\n"+
+		"Start a comment (or an issue body) with `%[1]s` and describe what you want:\n\n"+
+		"- `%[1]s implement this` — work the issue and open a pull request\n"+
+		"- `%[1]s review this PR` — review the pull request it's commented on\n"+
+		"- `%[1]s help` — this message\n\n"+
+		"Aizu reacts with 👀 when it picks the task up, posts a progress comment, and edits it into the result (🚀 done, 😕 failed).",
+		trigger)
 }
 
 // handle runs the agent in a sandbox and returns the message to post back.
@@ -158,9 +214,19 @@ func (w *Worker) buildPrompt(sid string, issue *github.Issue, task *queue.Task, 
 }
 
 // reply is the single choke point through which success and failure comments
-// flow; everything posted publicly is redacted here.
-func (w *Worker) reply(ctx context.Context, task *queue.Task, body string, log *slog.Logger) {
-	if err := w.gh.CreateComment(ctx, task.Repo, task.Number, redact(body, w.secrets...)); err != nil {
+// flow; everything posted publicly is redacted here. With a placeholder
+// comment ID it edits that comment in place, falling back to a new comment
+// on error — a result must never be lost.
+func (w *Worker) reply(ctx context.Context, task *queue.Task, placeholderID int64, body string, log *slog.Logger) {
+	body = redact(body, w.secrets...)
+	if placeholderID > 0 {
+		err := w.gh.UpdateComment(ctx, task.Repo, placeholderID, body)
+		if err == nil {
+			return
+		}
+		log.Warn("Could not update progress comment; posting a new one", "error", err)
+	}
+	if _, err := w.gh.CreateComment(ctx, task.Repo, task.Number, body); err != nil {
 		log.Warn("Could not post reply", "error", err)
 	}
 }

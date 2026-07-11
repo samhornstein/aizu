@@ -198,12 +198,29 @@ func (c *Client) AddReaction(ctx context.Context, repoFull string, commentID int
 	return c.post(ctx, u, body, nil)
 }
 
-// CreateComment posts a comment on an issue or PR. Every body is stamped with
-// ReplyMarker here, in the client, so no call site can forget it.
-func (c *Client) CreateComment(ctx context.Context, repoFull string, number int, body string) error {
-	body = strings.TrimRight(body, "\n") + "\n\n" + ReplyMarker
+// CreateComment posts a comment on an issue or PR and returns its ID (so the
+// caller can edit it later). Every body is stamped with ReplyMarker here, in
+// the client, so no call site can forget it.
+func (c *Client) CreateComment(ctx context.Context, repoFull string, number int, body string) (int64, error) {
+	var out struct {
+		ID int64 `json:"id"`
+	}
 	u := fmt.Sprintf("%s/repos/%s/issues/%d/comments", c.base(), repoFull, number)
-	return c.post(ctx, u, map[string]string{"body": body}, nil)
+	if err := c.post(ctx, u, map[string]string{"body": stampReply(body)}, &out); err != nil {
+		return 0, err
+	}
+	return out.ID, nil
+}
+
+// UpdateComment replaces an existing comment's body. The marker is stamped
+// here too, so an edited comment stays recognizable as Aizu's own.
+func (c *Client) UpdateComment(ctx context.Context, repoFull string, commentID int64, body string) error {
+	u := fmt.Sprintf("%s/repos/%s/issues/comments/%d", c.base(), repoFull, commentID)
+	return c.send(ctx, http.MethodPatch, u, map[string]string{"body": stampReply(body)}, nil)
+}
+
+func stampReply(body string) string {
+	return strings.TrimRight(body, "\n") + "\n\n" + ReplyMarker
 }
 
 // ListIssues returns issues (including PRs) across the repo updated at or
@@ -256,11 +273,16 @@ func (c *Client) getPaged(ctx context.Context, url string, out any) (string, err
 }
 
 func (c *Client) post(ctx context.Context, url string, body, out any) error {
+	return c.send(ctx, http.MethodPost, url, body, out)
+}
+
+// send performs a JSON-body request with the given method.
+func (c *Client) send(ctx context.Context, method, url string, body, out any) error {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(string(data)))
+	req, err := http.NewRequestWithContext(ctx, method, url, strings.NewReader(string(data)))
 	if err != nil {
 		return err
 	}

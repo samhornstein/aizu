@@ -189,11 +189,15 @@ func TestCreateComment(t *testing.T) {
 		if payload["body"] != "hello\n\n"+ReplyMarker {
 			t.Errorf("body = %q, want %q", payload["body"], "hello\n\n"+ReplyMarker)
 		}
-		return jsonResp(r, 201, `{}`), nil
+		return jsonResp(r, 201, `{"id":123}`), nil
 	})
 
-	if err := c.CreateComment(context.Background(), "o/r", 1, "hello"); err != nil {
+	id, err := c.CreateComment(context.Background(), "o/r", 1, "hello")
+	if err != nil {
 		t.Fatal(err)
+	}
+	if id != 123 {
+		t.Errorf("CreateComment() id = %d, want 123", id)
 	}
 }
 
@@ -207,10 +211,31 @@ func TestCreateCommentStampsMarkerAfterTrailingNewlines(t *testing.T) {
 		if strings.Count(payload["body"], ReplyMarker) != 1 {
 			t.Errorf("body = %q, want exactly one marker", payload["body"])
 		}
-		return jsonResp(r, 201, `{}`), nil
+		return jsonResp(r, 201, `{"id":1}`), nil
 	})
 
-	if err := c.CreateComment(context.Background(), "o/r", 1, "done\n\n\n"); err != nil {
+	if _, err := c.CreateComment(context.Background(), "o/r", 1, "done\n\n\n"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateComment(t *testing.T) {
+	c := fakeClient(func(r *http.Request) (*http.Response, error) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("method = %q, want PATCH", r.Method)
+		}
+		if r.URL.Path != "/repos/o/r/issues/comments/123" {
+			t.Errorf("path = %q, want /repos/o/r/issues/comments/123", r.URL.Path)
+		}
+		var payload map[string]string
+		json.NewDecoder(r.Body).Decode(&payload)
+		if payload["body"] != "done\n\n"+ReplyMarker {
+			t.Errorf("body = %q, want marker-stamped %q", payload["body"], "done\n\n"+ReplyMarker)
+		}
+		return jsonResp(r, 200, `{}`), nil
+	})
+
+	if err := c.UpdateComment(context.Background(), "o/r", 123, "done"); err != nil {
 		t.Fatal(err)
 	}
 }

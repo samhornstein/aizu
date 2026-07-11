@@ -138,3 +138,34 @@ func TestOldFormatListEntry(t *testing.T) {
 		t.Errorf("NextPending = %+v, want old-format task %s", got, task.ID)
 	}
 }
+
+// TestAllowRunLimits: the counter admits exactly `limit` runs per hour
+// bucket, then denies with an increasing count; expiry resets the window.
+func TestAllowRunLimits(t *testing.T) {
+	q, mr := newTestQueue(t)
+	ctx := context.Background()
+
+	for i := 1; i <= 2; i++ {
+		ok, n := q.AllowRun(ctx, "o/r", 2)
+		if !ok || n != int64(i) {
+			t.Fatalf("run %d: AllowRun = (%v, %d), want (true, %d)", i, ok, n, i)
+		}
+	}
+	if ok, n := q.AllowRun(ctx, "o/r", 2); ok || n != 3 {
+		t.Errorf("third run: AllowRun = (%v, %d), want (false, 3)", ok, n)
+	}
+
+	mr.FastForward(2 * time.Hour)
+	if ok, _ := q.AllowRun(ctx, "o/r", 2); !ok {
+		t.Error("counter should expire after the window")
+	}
+}
+
+func TestAllowRunDisabled(t *testing.T) {
+	q, _ := newTestQueue(t)
+	for i := 0; i < 5; i++ {
+		if ok, _ := q.AllowRun(context.Background(), "o/r", 0); !ok {
+			t.Fatal("limit 0 must disable the check")
+		}
+	}
+}

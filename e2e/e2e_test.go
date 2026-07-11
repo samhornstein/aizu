@@ -86,7 +86,14 @@ func TestPipeline(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]string{})
 	})
 
+	// The worker posts a "working on it" placeholder here, then edits it into
+	// the final result via PATCH — which is what the test waits for.
 	mux.HandleFunc("/repos/o/r/issues/1/comments", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{"id": 555}) //nolint:errcheck
+	})
+	mux.HandleFunc("/repos/o/r/issues/comments/555", func(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]string
 		json.NewDecoder(r.Body).Decode(&payload) //nolint:errcheck
 		select {
@@ -94,7 +101,6 @@ func TestPipeline(t *testing.T) {
 		default:
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]string{})
 	})
 

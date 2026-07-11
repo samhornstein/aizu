@@ -23,7 +23,11 @@ via the `origin` remote. The prompt tells you the repo and issue/PR number.
 
 ## Progress Updates
 
-1. Before starting work, post a checklist comment:
+Aizu itself posts a status comment and edits it into your final message, so
+short tasks need nothing from you. For longer, multi-step tasks, keep your
+own checklist comment:
+
+1. Post it once before starting:
    `gh issue comment <number> --repo <owner/repo> --body '- [ ] step…'`
 2. As you finish each step, edit that same comment (its ID is in the URL the
    first command prints):

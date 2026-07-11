@@ -28,6 +28,7 @@ type Config struct {
 	ContainerImage string // image the agent runs in
 	EngineCommand  string // command run inside the container; {prompt_file} is substituted
 	Timeout        int    // agent run timeout, seconds
+	MaxRunsPerHour int    // per-repo hourly cap on agent runs; 0 disables
 
 	// Poller
 	PollInterval time.Duration
@@ -48,6 +49,7 @@ func Load() *Config {
 		ContainerImage: "aizu-agent:pi", // pi-engine sandbox, built via `docker compose build agent`
 		EngineCommand:  `pi -p "$(cat {prompt_file})"`,
 		Timeout:        3600,
+		MaxRunsPerHour: 10,
 		PollInterval:   15 * time.Second,
 	}
 
@@ -75,6 +77,9 @@ func Load() *Config {
 	}
 	if n, ok := envInt("AIZU_TIMEOUT"); ok {
 		cfg.Timeout = n
+	}
+	if n, ok := envInt("AIZU_MAX_RUNS_PER_HOUR"); ok {
+		cfg.MaxRunsPerHour = n
 	}
 	if n, ok := envInt("POLL_INTERVAL"); ok && n > 0 {
 		cfg.PollInterval = time.Duration(n) * time.Second

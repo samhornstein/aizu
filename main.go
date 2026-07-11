@@ -74,6 +74,14 @@ func main() {
 	var wg sync.WaitGroup
 
 	if mode == "all" || mode == "worker" {
+		if cfg.AnthropicKey == "" && cfg.OpenAIKey == "" && cfg.OpenAIBaseURL == "" {
+			if base := config.AutodetectModelServer(); base != "" {
+				cfg.OpenAIBaseURL = base
+				slog.Info("Auto-detected local model server", "base_url", base)
+			} else {
+				slog.Warn("No model credential configured and no local model server found; agent runs will fail. Set OPENAI_BASE_URL, ANTHROPIC_API_KEY, or OPENAI_API_KEY.")
+			}
+		}
 		exec := executor.New(cfg)
 		exec.CleanupStale()
 		q.RecoverStale(ctx)

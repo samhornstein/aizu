@@ -10,7 +10,7 @@ Get Aizu running and trigger your first agent.
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/)
-- [llama.cpp](https://github.com/ggml-org/llama.cpp#quick-start) — `brew install llama.cpp` on Mac
+- A local model server — [Ollama](https://ollama.com/download) is the easiest ([llama.cpp](https://github.com/ggml-org/llama.cpp#quick-start) and [LM Studio](https://lmstudio.ai/) also work), or skip it and use an API key
 
 ## 1. Create a GitHub token
 
@@ -34,17 +34,21 @@ AIZU_REPOS=owner/repo
 
 ## 3. Start a local model
 
-Run a model server. The `-hf` flag downloads the model automatically (~1 GB on first run):
+With [Ollama](https://ollama.com/download) installed, pull a model (Ollama's server runs automatically):
+
+```bash
+ollama pull qwen2.5-coder:1.5b
+```
+
+That's it — Aizu auto-detects a running Ollama, llama.cpp, or LM Studio server on its standard port at startup. Set `OPENAI_BASE_URL` in `.env` only for a non-standard port or remote host.
+
+Using llama.cpp instead:
 
 ```bash
 llama-server -hf bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M --port 8080
 ```
 
-Then in `.env`, uncomment:
-
-```env
-OPENAI_BASE_URL=http://host.docker.internal:8080/v1
-```
+The `-hf` flag downloads the model automatically (~1 GB on first run).
 
 > **Using an API key instead?** Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in `.env` and skip this step.
 
@@ -98,8 +102,8 @@ docker compose restart aizu
 - The poller runs every 15 seconds; wait one interval then check the logs.
 
 **Agent fails with "no models returned" or connection error:**
-- Make sure `llama-server` is still running (`curl http://localhost:8080/v1/models`).
-- On Linux, replace `host.docker.internal` in `OPENAI_BASE_URL` with your host IP (e.g. `172.17.0.1`).
+- Make sure your model server is still running (`curl http://localhost:11434/v1/models` for Ollama, port 8080 for llama.cpp, 1234 for LM Studio).
+- Auto-detection happens once at startup — if you started the model server afterwards, restart Aizu (`docker compose restart aizu`).
 
 **Container exits immediately:**
 - Run `docker compose logs aizu` (without `-f`) to see the error before it restarts.

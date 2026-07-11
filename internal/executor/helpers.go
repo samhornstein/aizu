@@ -39,6 +39,14 @@ func run(cmd string, timeout time.Duration) (string, error) {
 	return string(out), err
 }
 
+// sandboxURL rewrites a localhost base URL to host.docker.internal for use
+// inside an agent container, where localhost is the container itself. URLs
+// pointing anywhere else pass through unchanged.
+func sandboxURL(base string) string {
+	base = strings.Replace(base, "://localhost", "://host.docker.internal", 1)
+	return strings.Replace(base, "://127.0.0.1", "://host.docker.internal", 1)
+}
+
 // shellQuote wraps s in single quotes, escaping any embedded single quotes.
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"

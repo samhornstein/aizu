@@ -28,6 +28,10 @@ func run(cmd string, timeout time.Duration) (string, error) {
 		defer cancel()
 	}
 	c := exec.CommandContext(ctx, "sh", "-c", cmd)
+	// Without WaitDelay, CombinedOutput blocks until every process holding
+	// the output pipe exits — a grandchild of sh can outlive the kill and
+	// stall the timeout for the child's full duration.
+	c.WaitDelay = time.Second
 	out, err := c.CombinedOutput()
 	if ctx.Err() == context.DeadlineExceeded {
 		return string(out), fmt.Errorf("%w after %s", errTimedOut, timeout)

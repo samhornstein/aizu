@@ -14,6 +14,5 @@ FROM alpine:3.21
 RUN apk add --no-cache docker-cli git ca-certificates
 
 COPY --from=builder /bin/aizu /usr/local/bin/aizu
-COPY AIZU.md /opt/aizu/AIZU.md
 
 ENTRYPOINT ["aizu"]

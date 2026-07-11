@@ -318,8 +318,8 @@ func TestListIssues(t *testing.T) {
 		if got := r.URL.Query().Get("since"); got == "" {
 			t.Error("missing since query param")
 		}
-		if got := r.URL.Query().Get("state"); got != "all" {
-			t.Errorf("state = %q, want all", got)
+		if got := r.URL.Query().Get("state"); got != "open" {
+			t.Errorf("state = %q, want open (closed issues must not trigger)", got)
 		}
 		return jsonResp(r, 200, string(body)), nil
 	})

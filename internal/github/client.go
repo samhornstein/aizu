@@ -223,12 +223,12 @@ func stampReply(body string) string {
 	return strings.TrimRight(body, "\n") + "\n\n" + ReplyMarker
 }
 
-// ListIssues returns issues (including PRs) across the repo updated at or
-// after since, oldest first, following pagination. Only open issues are returned.
+// ListIssues returns open issues (including PRs) across the repo updated at
+// or after since, oldest first, following pagination.
 func (c *Client) ListIssues(ctx context.Context, repoFull string, since time.Time) ([]Issue, error) {
 	q := url.Values{}
 	q.Set("since", since.UTC().Format(time.RFC3339))
-	q.Set("state", "all")
+	q.Set("state", "open")
 	q.Set("sort", "updated")
 	q.Set("direction", "asc")
 	q.Set("per_page", "100")

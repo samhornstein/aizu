@@ -1,46 +1,9 @@
 # Aizu Improvement Plans
 
-This directory contains self-contained implementation plans, one per feature branch.
-Each plan assumes **no prior context**: it explains the problem, the exact approach,
-the files to touch, the tests to write, and how to verify. Execute each plan on its
-own branch and open a PR against `main`.
-
-**Implementation order, phases, and dependencies live in [ROADMAP.md](ROADMAP.md) —
-read that first.**
-
-PR titles must follow Conventional Commits (enforced by `.github/workflows/pr-title.yml`).
-
-## Executing a plan
-
-Plans are executed **sequentially, one at a time, in ROADMAP order** — not as
-parallel branches. Later plans assume earlier plans' changes are already in
-`main` (they patch each other's final shapes), so parallel branches produce
-semantic conflicts that merge cleanly and break silently. Do not fan out.
-
-Per plan:
-
-1. Start from up-to-date `main` (the previous plan already merged). Create
-   the branch named in the plan's header.
-2. Implement exactly what the plan says. Its **Out of scope** section is a
-   hard boundary — if the implementation seems to require exceeding it, stop
-   and ask rather than improvise. Follow the philosophy guardrails at the
-   top of [ROADMAP.md](ROADMAP.md).
-3. Run the plan's **Verification** section. Do not open a PR until it passes.
-4. In the same PR: delete the plan file and remove its row from the index
-   below, so this directory always lists exactly the remaining work.
-5. Open the PR with the title from the plan's header; let CI pass; a human
-   reviews and merges before the next plan begins.
-
-Suggested session prompt: *"Read plans/ROADMAP.md, then implement
-plans/&lt;file&gt;.md. Follow it exactly, respect its Out of scope section, run
-its Verification commands before opening a PR, and delete the plan file +
-its README index row in the same PR."*
-
-## Index
-
-| Plan | Category | Severity / Value | Branch |
-|------|----------|------------------|--------|
-| [chore-code-quality.md](chore-code-quality.md) | Quality | Low — small cleanups and missing queue tests | `chore/code-quality` |
+All 15 implementation plans in this directory have been executed and merged
+(July 2026) — each as its own branch/PR, in the order laid out in
+[ROADMAP.md](ROADMAP.md). The roadmap remains for its milestone history,
+philosophy guardrails, and the v0.1 / launch checklists.
 
 ## Future ideas (not planned in detail)
 
@@ -54,3 +17,6 @@ See also the "Explicitly deferred" section of [ROADMAP.md](ROADMAP.md).
   network (e.g. an egress allowlist) instead of full network access.
 - **`aizu init` setup wizard** — interactive `.env` generation with
   self-tests (token valid? model reachable? Docker working?).
+- **Engine presets wave 2** — `aider` and `opencode` presets (the mechanism
+  and templates layout are in place; add a Dockerfile, a preset entry, a
+  compose service, and a release publish step per engine).

@@ -58,6 +58,30 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
+func TestConcurrencyDefault(t *testing.T) {
+	if got := Load().Concurrency; got != 1 {
+		t.Errorf("Concurrency = %d, want 1", got)
+	}
+}
+
+func TestConcurrencyOverride(t *testing.T) {
+	t.Setenv("AIZU_CONCURRENCY", "4")
+	if got := Load().Concurrency; got != 4 {
+		t.Errorf("Concurrency = %d, want 4", got)
+	}
+}
+
+func TestConcurrencyInvalidIgnored(t *testing.T) {
+	for _, bad := range []string{"0", "-1", "lots"} {
+		t.Run(bad, func(t *testing.T) {
+			t.Setenv("AIZU_CONCURRENCY", bad)
+			if got := Load().Concurrency; got != 1 {
+				t.Errorf("Concurrency = %d, want 1 (invalid %q ignored)", got, bad)
+			}
+		})
+	}
+}
+
 func TestEngineDefaultIsPi(t *testing.T) {
 	cfg := Load()
 	if cfg.Engine != "pi" {

@@ -23,12 +23,14 @@ if strings.Contains(err.Error(), "signal: killed") {
 
 **Problems:**
 
-1. The production image is Alpine (`Dockerfile`, runtime stage
-   `alpine:3.21`), whose busybox `timeout` sends **SIGTERM** by default — the
-   Go error is then `"signal: terminated"` (or `exit status 143` if the shell
-   catches it), so the `"signal: killed"` check misses, and a timeout is
-   misreported to the user as a generic engine failure with exit 1 instead of
-   the intended "Timed out after Ns" message with exit 124.
+1. **The timeout branch is dead code today.** When `timeout` kills the
+   engine, the outer `sh` exits with status 124 (or 143) — that error *is*
+   an `*exec.ExitError`, and `RunEngine`'s ExitError check comes **before**
+   the `"signal: killed"` check, so the ExitError branch always wins and
+   returns a generic exit-1 failure. The "Timed out after Ns" / exit-124
+   path is unreachable regardless of platform. (Even if the order were
+   flipped, Alpine's busybox `timeout` sends SIGTERM, producing
+   `"signal: terminated"`, so the string match would still miss.)
 2. Behavior differs between dev (macOS/coreutils) and prod (busybox), and
    relies on `timeout` existing at all.
 3. String-matching error text is brittle.

@@ -67,8 +67,8 @@ and tell the agent when it cannot push.
 
    ```go
    if prNumber > 0 {
-       fetch := fmt.Sprintf("cd /workspace/repo && git fetch origin %s && git checkout %s",
-           shellQuote(fmt.Sprintf("pull/%d/head:%s", prNumber, branch)),
+       fetch := fmt.Sprintf("cd /workspace/repo && git fetch origin %s && git checkout -B %s FETCH_HEAD",
+           shellQuote(fmt.Sprintf("pull/%d/head", prNumber)),
            shellQuote(branch))
        if _, err := e.exec(sid, fetch, 0); err != nil {
            return "", fmt.Errorf("fetch PR #%d: %w", prNumber, err)
@@ -79,9 +79,14 @@ and tell the agent when it cannot push.
    ```
 
    Note: cloning then fetching `pull/N/head` works for both same-repo and
-   fork PRs, so use it unconditionally for PRs. The local branch is named
-   after `pr.Head.Ref` so `git push origin <branch>` still does the right
-   thing for same-repo PRs.
+   fork PRs, so use it unconditionally for PRs. Do **not** use the
+   `pull/N/head:<branch>` refspec form — git refuses to fetch into the
+   currently checked-out branch, so it breaks whenever `pr.Head.Ref` equals
+   the clone's default branch (e.g. a fork PR opened from the fork's
+   `main`). `git checkout -B <branch> FETCH_HEAD` has no such restriction
+   (it resets the branch even if current). The local branch is named after
+   `pr.Head.Ref` so `git push origin <branch>` still does the right thing
+   for same-repo PRs.
 
 4. **Tell the agent when it can't push.** In `internal/worker/worker.go`:
    - In `handle()`, after fetching the PR, compute

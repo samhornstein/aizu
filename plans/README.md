@@ -44,7 +44,6 @@ The only pair safe to run in parallel is `bugfix-stale-running-set.md` and
 | Plan | Category | Severity / Value | Branch |
 |------|----------|------------------|--------|
 | [bugfix-fork-pr-checkout.md](bugfix-fork-pr-checkout.md) | Bug | Medium — PRs from forks fail at checkout | `fix/fork-pr-checkout` |
-| [feat-startup-selfcheck.md](feat-startup-selfcheck.md) | Quickstart | High — bad token/repo fails fast with instructions instead of log spam | `feat/startup-selfcheck` |
 | [feat-prebuilt-images.md](feat-prebuilt-images.md) | Quickstart | High — install via one compose file, no clone/build | `feat/prebuilt-images` |
 | [security-collaborator-gate.md](security-collaborator-gate.md) | Security | **High** — today anyone who can comment can trigger the agent | `fix/collaborator-gate` |
 | [feat-sandbox-github-api.md](feat-sandbox-github-api.md) | Agent capability | High — makes AIZU.md's progress updates actually possible | `feat/sandbox-github-api` |

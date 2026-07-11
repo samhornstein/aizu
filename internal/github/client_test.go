@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -143,6 +144,35 @@ func TestHTTPErrorPropagated(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "404") {
 		t.Errorf("error %q should mention status 404", err.Error())
+	}
+	var se *StatusError
+	if !errors.As(err, &se) || se.Code != 404 {
+		t.Errorf("error = %#v, want *StatusError with Code 404", err)
+	}
+}
+
+func TestCheckRepoOK(t *testing.T) {
+	c := fakeClient(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path != "/repos/o/r" {
+			t.Errorf("path = %q, want /repos/o/r", r.URL.Path)
+		}
+		return jsonResp(r, 200, `{"full_name":"o/r"}`), nil
+	})
+
+	if err := c.CheckRepo(context.Background(), "o/r"); err != nil {
+		t.Fatalf("CheckRepo() error = %v, want nil", err)
+	}
+}
+
+func TestCheckRepoNotFound(t *testing.T) {
+	c := fakeClient(func(r *http.Request) (*http.Response, error) {
+		return jsonResp(r, 404, `{"message":"Not Found"}`), nil
+	})
+
+	err := c.CheckRepo(context.Background(), "o/nope")
+	var se *StatusError
+	if !errors.As(err, &se) || se.Code != 404 {
+		t.Fatalf("CheckRepo() error = %#v, want *StatusError with Code 404", err)
 	}
 }
 

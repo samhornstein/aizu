@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/samhornstein/aizu/internal/config"
@@ -358,6 +359,52 @@ func TestIssueBodyWithMarkerDoesNotTrigger(t *testing.T) {
 	p.pollOnce(context.Background())
 	if n := queueLen(t, q); n != 0 {
 		t.Errorf("queue len = %d, want 0 (marked issue body must not trigger)", n)
+	}
+}
+
+// TestPollErrorThrottled: a repo that fails every poll is logged once per
+// errLogInterval, not per tick; recovery clears the throttle state.
+func TestPollErrorThrottled(t *testing.T) {
+	var failing atomic.Bool
+	failing.Store(true)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/issues/comments", func(w http.ResponseWriter, r *http.Request) {
+		if failing.Load() {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		writeJSON(t, w, []any{})
+	})
+	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, []any{})
+	})
+
+	p, _ := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}}, mux)
+	ctx := context.Background()
+
+	p.pollOnce(ctx)
+	first, ok := p.lastErrLog["o/r"]
+	if !ok {
+		t.Fatal("first failing poll did not record a logged error")
+	}
+
+	p.pollOnce(ctx)
+	if got := p.lastErrLog["o/r"]; !got.Equal(first) {
+		t.Error("second failing poll inside the throttle window logged again (timestamp advanced)")
+	}
+
+	// Simulate the throttle window elapsing: the next failure logs again.
+	p.lastErrLog["o/r"] = time.Now().Add(-errLogInterval - time.Second)
+	p.pollOnce(ctx)
+	if got := p.lastErrLog["o/r"]; !got.After(first) {
+		t.Error("failure after the throttle window did not log again")
+	}
+
+	// Recovery clears the state so a future failure logs immediately.
+	failing.Store(false)
+	p.pollOnce(ctx)
+	if _, ok := p.lastErrLog["o/r"]; ok {
+		t.Error("successful poll did not clear the throttle state")
 	}
 }
 

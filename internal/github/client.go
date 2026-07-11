@@ -104,6 +104,24 @@ type PullRequest struct {
 	} `json:"head"`
 }
 
+// StatusError is a non-2xx GitHub response. It lets callers distinguish
+// auth/permission failures (which are config problems) from network errors.
+type StatusError struct {
+	Code int
+	Path string
+	Body string
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("github: %s -> %d: %s", e.Path, e.Code, e.Body)
+}
+
+// CheckRepo verifies the token can see the repo. A 404 means the repo
+// doesn't exist or the token has no access (GitHub does not distinguish).
+func (c *Client) CheckRepo(ctx context.Context, repoFull string) error {
+	return c.get(ctx, fmt.Sprintf("%s/repos/%s", c.base(), repoFull), nil)
+}
+
 // AuthenticatedUser returns the account the token belongs to. Aizu ignores
 // comments from this account to avoid reacting to its own replies.
 func (c *Client) AuthenticatedUser(ctx context.Context) (User, error) {
@@ -247,7 +265,7 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 func decode(resp *http.Response, out any) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("github: %s -> %d: %s", resp.Request.URL.Path, resp.StatusCode, strings.TrimSpace(string(b)))
+		return &StatusError{Code: resp.StatusCode, Path: resp.Request.URL.Path, Body: strings.TrimSpace(string(b))}
 	}
 	if out == nil {
 		_, _ = io.Copy(io.Discard, resp.Body)

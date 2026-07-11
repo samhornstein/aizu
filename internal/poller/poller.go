@@ -30,17 +30,26 @@ const seenIssuePrefix = "aizu:seen:issue:"
 const seenCommentPrefix = "aizu:seen:comment:"
 const seenTTL = 30 * 24 * time.Hour
 
+// errLogInterval throttles repeated poll-failure logs per repo: a repo that
+// starts failing after boot (revoked token, repo made private) is reported
+// once, then at most once per interval, instead of every poll tick.
+const errLogInterval = 10 * time.Minute
+
 // Poller polls GitHub and enqueues triggered comments.
 type Poller struct {
 	cfg *config.Config
 	gh  *github.Client
 	q   *queue.Queue
 	rdb *redis.Client
+
+	// lastErrLog tracks when each repo's poll failure was last logged, for
+	// throttling. Only touched from the single Run goroutine.
+	lastErrLog map[string]time.Time
 }
 
 // New constructs a Poller.
 func New(cfg *config.Config, gh *github.Client, q *queue.Queue) *Poller {
-	return &Poller{cfg: cfg, gh: gh, q: q, rdb: q.Client()}
+	return &Poller{cfg: cfg, gh: gh, q: q, rdb: q.Client(), lastErrLog: make(map[string]time.Time)}
 }
 
 // Run polls on the configured interval until ctx is cancelled.
@@ -63,8 +72,17 @@ func (p *Poller) Run(ctx context.Context) {
 
 func (p *Poller) pollOnce(ctx context.Context) {
 	for _, repo := range p.cfg.Repos {
-		if err := p.pollRepo(ctx, repo); err != nil {
+		err := p.pollRepo(ctx, repo)
+		if err == nil {
+			if _, wasFailing := p.lastErrLog[repo]; wasFailing {
+				delete(p.lastErrLog, repo)
+				slog.Info("Polling recovered", "repo", repo)
+			}
+			continue
+		}
+		if last, ok := p.lastErrLog[repo]; !ok || time.Since(last) >= errLogInterval {
 			slog.Error("Poll failed", "repo", repo, "error", err)
+			p.lastErrLog[repo] = time.Now()
 		}
 	}
 }

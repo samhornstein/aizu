@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -54,13 +56,23 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Resolve the token's login for logging. Self-comment filtering does not
-	// depend on it: Aizu's replies carry a content marker the poller skips.
+	// Validate the token up front: a rejected token means nothing can work,
+	// so fail with instructions instead of letting every poll error out. A
+	// network error is not a config problem — warn and keep running.
 	if user, err := gh.AuthenticatedUser(ctx); err != nil {
-		slog.Warn("Could not resolve authenticated user; check GITHUB_TOKEN", "error", err)
+		var se *github.StatusError
+		if errors.As(err, &se) {
+			fmt.Fprintf(os.Stderr, "Error: GitHub rejected the token (%d). Check GITHUB_TOKEN in .env — it must be a classic personal access token with the `repo` scope (https://github.com/settings/tokens).\n", se.Code)
+			os.Exit(1)
+		}
+		slog.Warn("Could not reach GitHub; continuing", "error", err)
 	} else {
 		cfg.BotUsername = user.Login
 		slog.Info("Authenticated", "login", user.Login, "type", user.Type)
+	}
+
+	if mode == "all" || mode == "poller" {
+		checkRepos(ctx, gh, cfg)
 	}
 
 	go func() {
@@ -106,4 +118,36 @@ func main() {
 	<-ctx.Done()
 	wg.Wait()
 	slog.Info("Shutdown complete")
+}
+
+// checkRepos verifies each watched repo is visible to the token, drops the
+// ones that aren't (so the poller doesn't spam about them), and exits when
+// none are usable. Network errors keep the repo — GitHub being unreachable
+// is not a config problem.
+func checkRepos(ctx context.Context, gh *github.Client, cfg *config.Config) {
+	account := cfg.BotUsername
+	if account == "" {
+		account = "the token's account"
+	}
+	var good []string
+	for _, repo := range cfg.Repos {
+		err := gh.CheckRepo(ctx, repo)
+		if err == nil {
+			good = append(good, repo)
+			continue
+		}
+		var se *github.StatusError
+		if errors.As(err, &se) {
+			fmt.Fprintf(os.Stderr, "Error: cannot access %s (%d). Either the name is misspelled, or %s lacks access. For private repos: add the account as a collaborator AND accept the invite from that account.\n", repo, se.Code, account)
+			continue
+		}
+		slog.Warn("Could not verify repo; keeping it", "repo", repo, "error", err)
+		good = append(good, repo)
+	}
+	if len(good) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: none of the configured repos are accessible. Fix AIZU_REPOS in .env.\n")
+		os.Exit(1)
+	}
+	cfg.Repos = good
+	slog.Info(fmt.Sprintf("Watching %d repo(s) as %s: %s", len(good), account, strings.Join(good, ", ")))
 }

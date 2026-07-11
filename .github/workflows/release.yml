@@ -5,9 +5,9 @@ name: Release
 # (git-cliff): feat -> minor, fix -> patch, ! / BREAKING -> major. It tags the
 # commit, generates a changelog, and publishes a GitHub Release.
 #
-# No container images are published: the default install builds from source
-# (see docker-compose.yml), so there's nothing to pull. The version of a running
-# instance is the commit it was built from (`git describe --tags` in the clone).
+# Each release also publishes multi-arch images to ghcr.io — the default
+# no-clone install (deploy/docker-compose.yml) pulls :latest. Building from
+# source (the root docker-compose.yml) remains the contributor path.
 on:
   workflow_dispatch:
     inputs:
@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: write # push the tag + create the release
+  packages: write # publish images to ghcr.io
 
 jobs:
   release:
@@ -78,3 +79,33 @@ jobs:
           gh release create "${{ steps.ver.outputs.next }}" \
             --title "${{ steps.ver.outputs.next }}" \
             --notes-file CHANGES.md
+
+      # Publish images from this same checkout — the tag above points at
+      # HEAD, so source and tag always match.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish aizu image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/samhornstein/aizu:latest
+            ghcr.io/samhornstein/aizu:${{ steps.ver.outputs.next }}
+
+      - name: Publish agent image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./templates/pi
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/samhornstein/aizu-agent-pi:latest
+            ghcr.io/samhornstein/aizu-agent-pi:${{ steps.ver.outputs.next }}

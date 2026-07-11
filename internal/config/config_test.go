@@ -12,8 +12,13 @@ func TestEnvOverrides(t *testing.T) {
 	t.Setenv("POLL_INTERVAL", "60")
 	t.Setenv("AIZU_TIMEOUT", "300")
 	t.Setenv("REDIS_URL", "redis://myhost:6379")
+	t.Setenv("CONTAINER_IMAGE", "my-agent:dev")
 
 	cfg := Load()
+
+	if cfg.ContainerImage != "my-agent:dev" {
+		t.Errorf("ContainerImage = %q, want my-agent:dev (env must override the ghcr default)", cfg.ContainerImage)
+	}
 
 	if cfg.Trigger != "@bot" {
 		t.Errorf("Trigger = %q, want @bot", cfg.Trigger)
@@ -41,8 +46,8 @@ func TestDefaults(t *testing.T) {
 	if cfg.Trigger != "aizu" {
 		t.Errorf("Trigger = %q, want aizu", cfg.Trigger)
 	}
-	if cfg.ContainerImage != "aizu-agent:pi" {
-		t.Errorf("ContainerImage = %q, want aizu-agent:pi", cfg.ContainerImage)
+	if cfg.ContainerImage != "ghcr.io/samhornstein/aizu-agent-pi:latest" {
+		t.Errorf("ContainerImage = %q, want the ghcr.io agent image", cfg.ContainerImage)
 	}
 	if cfg.Timeout != 3600 {
 		t.Errorf("Timeout = %d, want 3600", cfg.Timeout)

@@ -18,19 +18,20 @@ Generate a [classic token](https://github.com/settings/tokens) with the `repo` s
 
 > **Want replies from a separate identity?** Create a dedicated account at [github.com/join](https://github.com/join) using `yourname+aizu@gmail.com` as the email and `yourname-aizu` as the username — GitHub treats the `+` address as separate but it lands in your existing inbox. Generate the token from that account instead. For private repos, add the bot account as a collaborator (**Settings → Collaborators → Add people**) and accept the invite from the bot account before the token will work.
 
-## 2. Clone and configure
+## 2. Download and configure
+
+No clone, no build — one compose file and a two-line `.env`:
 
 ```bash
-git clone https://github.com/samhornstein/aizu.git && cd aizu
-```
-
-Create a `.env` with your token and the repositories to watch (see
-`.env.example` for all options):
-
-```env
+mkdir aizu && cd aizu
+curl -fsSLO https://raw.githubusercontent.com/samhornstein/aizu/main/deploy/docker-compose.yml
+cat > .env <<EOF
 GITHUB_TOKEN=ghp_YOUR_TOKEN_HERE
 AIZU_REPOS=owner/repo
+EOF
 ```
+
+See the repo's `.env.example` for all options. To build from source instead, see [Development](../../development/).
 
 ## 3. Start a local model
 
@@ -54,14 +55,11 @@ The `-hf` flag downloads the model automatically (~1 GB on first run).
 
 ## 4. Start
 
-Build the agent sandbox image (first run only), then start Aizu:
-
 ```bash
-docker compose build agent
 docker compose up -d
 ```
 
-Aizu begins polling for `aizu` mentions immediately. Follow along with:
+Aizu begins polling for `aizu` mentions immediately (the agent sandbox image is pulled on first use). Follow along with:
 
 ```bash
 docker compose logs -f aizu
@@ -86,12 +84,12 @@ Within one polling interval (15 seconds by default) Aizu reacts with 👀, runs 
 docker compose logs -f aizu
 ```
 
-**Rebuild and restart after config or code changes:**
+**Update to the latest release:**
 ```bash
-docker compose up -d --build
+docker compose pull && docker compose up -d
 ```
 
-**Restart without rebuilding** (e.g. after editing `.env`):
+**Restart** (e.g. after editing `.env`):
 ```bash
 docker compose restart aizu
 ```

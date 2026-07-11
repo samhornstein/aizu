@@ -46,7 +46,7 @@ func Load() *Config {
 	cfg := &Config{
 		RedisURL:       "redis://localhost:6379",
 		Trigger:        "aizu",
-		ContainerImage: "aizu-agent:pi", // pi-engine sandbox, built via `docker compose build agent`
+		ContainerImage: "ghcr.io/samhornstein/aizu-agent-pi:latest", // pulled on first use; dev compose overrides to the local build
 		EngineCommand:  `pi -p "$(cat {prompt_file})"`,
 		Timeout:        3600,
 		MaxRunsPerHour: 10,

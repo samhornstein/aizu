@@ -1,0 +1,46 @@
+# Aizu — no-clone install. Download this file into an empty directory, create
+# a .env next to it (GITHUB_TOKEN + AIZU_REPOS at minimum; see
+# https://github.com/samhornstein/aizu/blob/main/.env.example), then:
+#
+#   docker compose up -d
+#
+# Images are published by the Release workflow. To build from source instead,
+# clone the repo and use its root docker-compose.yml.
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - aizu-net
+
+  aizu:
+    image: ghcr.io/samhornstein/aizu:latest
+    restart: unless-stopped
+    # The worker launches agent sandboxes via the host Docker daemon; the
+    # agent image (ghcr.io/samhornstein/aizu-agent-pi) is pulled on first use.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    env_file:
+      - .env
+    environment:
+      # Reach the bundled Redis by its compose service name. Override via
+      # REDIS_URL in .env for a hosted/external Redis.
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    # host.docker.internal is built in on Docker Desktop but not on Linux;
+    # this makes it resolve everywhere so local model servers on the host
+    # (Ollama, llama.cpp, LM Studio) are reachable.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+    networks:
+      - aizu-net
+
+volumes:
+  redis-data:
+
+networks:
+  aizu-net:
+    driver: bridge

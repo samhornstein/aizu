@@ -43,7 +43,6 @@ The only pair safe to run in parallel is `bugfix-stale-running-set.md` and
 
 | Plan | Category | Severity / Value | Branch |
 |------|----------|------------------|--------|
-| [bugfix-stale-running-set.md](bugfix-stale-running-set.md) | Bug | **High** — a crash mid-task permanently blocks an issue | `fix/stale-running-set` |
 | [bugfix-timeout-detection.md](bugfix-timeout-detection.md) | Bug | Medium — engine timeouts are misreported as generic failures | `fix/timeout-detection` |
 | [bugfix-fork-pr-checkout.md](bugfix-fork-pr-checkout.md) | Bug | Medium — PRs from forks fail at checkout | `fix/fork-pr-checkout` |
 | [feat-single-account-mode.md](feat-single-account-mode.md) | Quickstart | **High** — removes the "create a bot account" setup step | `feat/single-account-mode` |

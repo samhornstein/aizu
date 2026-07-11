@@ -114,4 +114,6 @@ The root `docker-compose.yml` builds from source and uses the locally built agen
 
 ## Docs
 
-Full documentation: `make docs-serve`
+Full documentation: **https://samhornstein.github.io/aizu/**
+
+To serve it locally: `make docs-serve`

@@ -26,10 +26,14 @@ This page covers the settings that involve a trade-off worth understanding.
 
 - **`AIZU_TIMEOUT`** — defaults to a generous 1-hour limit for long agent runs;
   lower it (e.g. 300–600s) to fail fast on simple tasks.
-- **`ENGINE_COMMAND`** — must keep the `{prompt_file}` placeholder, which is
-  replaced with the prompt's path at runtime.
-- **`CONTAINER_IMAGE`** — the sandbox image the agent runs in. Swap it (together
-  with `ENGINE_COMMAND`) to run a different coding agent.
+- **`AIZU_ENGINE`** — picks a coding-agent preset (`pi` default, `claude` for
+  Claude Code); it sets the sandbox image and command for you.
+- **`ENGINE_COMMAND`** — overrides the preset's command, for custom agents.
+  Must keep the `{prompt_file}` placeholder, which is replaced with the
+  prompt's path at runtime (`{model}` is replaced with the discovered local
+  model ID, if present).
+- **`CONTAINER_IMAGE`** — overrides the preset's sandbox image. Swap it
+  (together with `ENGINE_COMMAND`) to run an agent without a preset.
 
 ## Poller
 

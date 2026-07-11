@@ -28,9 +28,11 @@ install-hooks:
 	ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
 	ln -sf ../../.githooks/commit-msg .git/hooks/commit-msg
 
-# Build the agent sandbox image (aizu-agent:pi) the worker runs agents in.
+# Build the agent sandbox image (aizu-agent:$(ENGINE)) the worker runs
+# agents in. ENGINE=claude make build-agent builds the Claude Code image.
+ENGINE ?= pi
 build-agent:
-	docker compose build agent
+	docker compose build agent-$(ENGINE)
 
 # Build the agent image, then start Aizu + Redis.
 up: build-agent

@@ -77,7 +77,10 @@ func (e *containerExecutor) Create(repo, branch string, prNumber int) (string, e
 }
 
 func (e *containerExecutor) writeModelsJSON(sid string) error {
-	if e.cfg.OpenAIBaseURL == "" {
+	// The models.json layout (and its /root/.pi path) is pi-specific; other
+	// engines get their model configuration via env/flags. An empty Engine
+	// (config built without Load, e.g. in tests) keeps the pi behavior.
+	if e.cfg.OpenAIBaseURL == "" || (e.cfg.Engine != "" && e.cfg.Engine != "pi") {
 		return nil
 	}
 	modelID, err := discoverModelID(e.cfg.OpenAIBaseURL)
@@ -148,11 +151,9 @@ func (e *containerExecutor) RunEngine(sid, prompt string) (int, string, error) {
 		return 1, "", fmt.Errorf("write prompt: %w", err)
 	}
 
-	command := strings.Replace(e.cfg.EngineCommand, "{prompt_file}", promptFile, 1)
-	if e.cfg.OpenAIBaseURL != "" {
-		if modelID, err := discoverModelID(e.cfg.OpenAIBaseURL); err == nil {
-			command = strings.Replace(command, "pi ", "pi --model "+shellQuote(modelID)+" ", 1)
-		}
+	command, err := resolveEngineCommand(e.cfg, discoverModelID)
+	if err != nil {
+		return 1, "", err
 	}
 	// Credentials and git identity are container env (set at docker run);
 	// nothing to export here.

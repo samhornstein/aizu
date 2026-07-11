@@ -55,14 +55,15 @@ published ghcr.io images are only used by the no-clone install
 docker compose up -d --build
 ```
 
-The agent sandbox image (`aizu-agent:pi`, from `templates/pi/Dockerfile`) is
-also built from source, via the `agent` Compose profile — `make up` builds it
-for you. The tag names the engine; to run a different agent, add
-`templates/<engine>/Dockerfile` and set `CONTAINER_IMAGE`/`ENGINE_COMMAND` for
-it. Rebuild after changing the agent Dockerfile:
+The agent sandbox images (`aizu-agent:<engine>`, from
+`templates/<engine>/Dockerfile`) are also built from source, via the `agent`
+Compose profile — `make up` builds the pi one for you. To run a different
+engine, use its preset (`AIZU_ENGINE=claude`) or add a template and set
+`CONTAINER_IMAGE`/`ENGINE_COMMAND`. Rebuild after changing an agent
+Dockerfile:
 
 ```bash
-docker compose build agent
+make build-agent            # ENGINE=claude for the Claude Code image
 ```
 
 ## Commits

@@ -52,6 +52,55 @@ func TestRunNoTimeout(t *testing.T) {
 	}
 }
 
+func TestResolveEngineCommand(t *testing.T) {
+	discover := func(base string) (string, error) { return "qwen", nil }
+	discoverFail := func(base string) (string, error) { return "", errors.New("down") }
+
+	t.Run("no local server uses Command", func(t *testing.T) {
+		cfg := &config.Config{EngineCommand: `pi -p "$(cat {prompt_file})"`, EngineLocalCommand: `pi --model {model} -p x`}
+		got, err := resolveEngineCommand(cfg, discoverFail) // discover must not be called
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := `pi -p "$(cat ` + promptFile + `)"`; got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("local server uses LocalCommand with model", func(t *testing.T) {
+		cfg := &config.Config{
+			OpenAIBaseURL:      "http://localhost:8080/v1",
+			EngineCommand:      `pi -p x`,
+			EngineLocalCommand: `pi --model {model} -p "$(cat {prompt_file})"`,
+		}
+		got, err := resolveEngineCommand(cfg, discover)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := `pi --model 'qwen' -p "$(cat ` + promptFile + `)"`; got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("no local variant runs Command even with local server", func(t *testing.T) {
+		cfg := &config.Config{OpenAIBaseURL: "http://x/v1", EngineCommand: `claude -p "$(cat {prompt_file})"`}
+		got, err := resolveEngineCommand(cfg, discoverFail)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(got, "{model}") || strings.Contains(got, "{prompt_file}") {
+			t.Errorf("placeholders left in %q", got)
+		}
+	})
+
+	t.Run("discovery failure errors when model is needed", func(t *testing.T) {
+		cfg := &config.Config{OpenAIBaseURL: "http://x/v1", EngineCommand: `a`, EngineLocalCommand: `pi --model {model} -p {prompt_file}`}
+		if _, err := resolveEngineCommand(cfg, discoverFail); err == nil {
+			t.Error("want error when {model} cannot be resolved")
+		}
+	})
+}
+
 func TestSandboxURL(t *testing.T) {
 	cases := map[string]string{
 		"http://localhost:11434/v1":            "http://host.docker.internal:11434/v1",

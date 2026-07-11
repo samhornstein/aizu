@@ -23,7 +23,9 @@ import (
 
 type mockExec struct{}
 
-func (m *mockExec) Create(repo, branch string) (string, error) { return "test-sid", nil }
+func (m *mockExec) Create(repo, branch string, prNumber int) (string, error) {
+	return "test-sid", nil
+}
 func (m *mockExec) RunEngine(sid, prompt string) (int, string, error) {
 	return 0, "agent output", nil
 }

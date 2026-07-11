@@ -96,11 +96,17 @@ type Issue struct {
 // IsPR reports whether this issue is a pull request.
 func (i Issue) IsPR() bool { return i.PullRequest != nil }
 
-// PullRequest carries the head branch name needed to check out a PR.
+// PullRequest carries the head branch name needed to check out a PR, and the
+// head repo so callers can detect fork PRs. GitHub sends "repo": null when
+// the fork was deleted; that decodes to a zero Repo, so an empty FullName
+// also means "treat as fork / unpushable".
 type PullRequest struct {
 	Number int `json:"number"`
 	Head   struct {
-		Ref string `json:"ref"`
+		Ref  string `json:"ref"`
+		Repo struct {
+			FullName string `json:"full_name"`
+		} `json:"repo"`
 	} `json:"head"`
 }
 

@@ -215,6 +215,31 @@ func TestCreateCommentStampsMarkerAfterTrailingNewlines(t *testing.T) {
 	}
 }
 
+func TestPullRequestHeadRepoDecoding(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{"fork", `{"number":5,"head":{"ref":"f","repo":{"full_name":"someone/fork"}}}`, "someone/fork"},
+		{"deleted fork", `{"number":5,"head":{"ref":"f","repo":null}}`, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := fakeClient(func(r *http.Request) (*http.Response, error) {
+				return jsonResp(r, 200, tc.body), nil
+			})
+			pr, err := c.GetPullRequest(context.Background(), "o/r", 5)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if pr.Head.Repo.FullName != tc.want {
+				t.Errorf("Head.Repo.FullName = %q, want %q", pr.Head.Repo.FullName, tc.want)
+			}
+		})
+	}
+}
+
 func TestIssueIsPR(t *testing.T) {
 	if (Issue{}).IsPR() {
 		t.Error("zero Issue should not be a PR")

@@ -20,7 +20,7 @@ type containerExecutor struct {
 	cfg *config.Config
 }
 
-func (e *containerExecutor) Create(repo, branch string) (string, error) {
+func (e *containerExecutor) Create(repo, branch string, prNumber int) (string, error) {
 	sid := "aizu-" + uuid.New().String()[:8]
 
 	// --add-host makes host.docker.internal resolve on Linux too (it is
@@ -42,7 +42,17 @@ func (e *containerExecutor) Create(repo, branch string) (string, error) {
 	if _, err := e.exec(sid, "cd /workspace/repo && git config user.name aizu && git config user.email aizu@noreply", 0); err != nil {
 		return "", fmt.Errorf("git config: %w", err)
 	}
-	if branch != "" {
+	if prNumber > 0 {
+		// refs/pull/<n>/head exists in the base repo for fork PRs too. Not
+		// the pull/N/head:<branch> refspec form: git refuses to fetch into
+		// the checked-out branch, which breaks when the PR's head ref equals
+		// the default branch. checkout -B resets it regardless.
+		fetch := fmt.Sprintf("cd /workspace/repo && git fetch origin %s && git checkout -B %s FETCH_HEAD",
+			shellQuote(fmt.Sprintf("pull/%d/head", prNumber)), shellQuote(branch))
+		if _, err := e.exec(sid, fetch, 0); err != nil {
+			return "", fmt.Errorf("fetch PR #%d: %w", prNumber, err)
+		}
+	} else if branch != "" {
 		if _, err := e.exec(sid, fmt.Sprintf("cd /workspace/repo && git checkout %s", shellQuote(branch)), 0); err != nil {
 			return "", fmt.Errorf("git checkout %s: %w", branch, err)
 		}

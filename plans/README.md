@@ -36,14 +36,10 @@ plans/&lt;file&gt;.md. Follow it exactly, respect its Out of scope section, run
 its Verification commands before opening a PR, and delete the plan file +
 its README index row in the same PR."*
 
-The only pair safe to run in parallel is `bugfix-stale-running-set.md` and
-`bugfix-timeout-detection.md` (disjoint packages); it is rarely worth it.
-
 ## Index
 
 | Plan | Category | Severity / Value | Branch |
 |------|----------|------------------|--------|
-| [bugfix-fork-pr-checkout.md](bugfix-fork-pr-checkout.md) | Bug | Medium — PRs from forks fail at checkout | `fix/fork-pr-checkout` |
 | [feat-prebuilt-images.md](feat-prebuilt-images.md) | Quickstart | High — install via one compose file, no clone/build | `feat/prebuilt-images` |
 | [security-collaborator-gate.md](security-collaborator-gate.md) | Security | **High** — today anyone who can comment can trigger the agent | `fix/collaborator-gate` |
 | [feat-sandbox-github-api.md](feat-sandbox-github-api.md) | Agent capability | High — makes AIZU.md's progress updates actually possible | `feat/sandbox-github-api` |

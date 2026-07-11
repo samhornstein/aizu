@@ -124,7 +124,7 @@ func TestPipeline(t *testing.T) {
 		BotUsername:  "alice",
 	}
 
-	gh := github.NewWithBaseURL("test-token", srv.URL)
+	gh := github.NewWithBaseURL("test-token", srv.URL, false)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

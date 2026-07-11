@@ -214,7 +214,7 @@ func TestHandleThreadsPRNumber(t *testing.T) {
 			exec := &mockExecutor{fileErr: errors.New("no file")}
 			w := &Worker{
 				exec:   exec,
-				gh:     github.NewWithBaseURL("t", srv.URL),
+				gh:     github.NewWithBaseURL("t", srv.URL, false),
 				loader: template.NewLoader("sys"),
 			}
 			task := &queue.Task{Repo: "o/r", Number: 5, CommentID: 1, Author: "bob", Body: "@aizu"}
@@ -280,7 +280,7 @@ func TestProcessRedactsSecrets(t *testing.T) {
 			w := New(
 				queue.New("redis://"+mr.Addr()),
 				&mockExecutor{fileErr: errors.New("no file"), engineExit: tc.exitCode, engineOut: "leaked: " + token},
-				github.NewWithBaseURL("t", srv.URL),
+				github.NewWithBaseURL("t", srv.URL, false),
 				template.NewLoader("sys"),
 				&config.Config{GitHubToken: token},
 			)
@@ -373,7 +373,7 @@ func newFeedbackServer(t *testing.T) (*feedbackServer, *httptest.Server) {
 func newFeedbackWorker(t *testing.T, srv *httptest.Server, exec *mockExecutor, cfg *config.Config) *Worker {
 	t.Helper()
 	mr := miniredis.RunT(t)
-	return New(queue.New("redis://"+mr.Addr()), exec, github.NewWithBaseURL("t", srv.URL), template.NewLoader("sys"), cfg)
+	return New(queue.New("redis://"+mr.Addr()), exec, github.NewWithBaseURL("t", srv.URL, false), template.NewLoader("sys"), cfg)
 }
 
 func commentTask(id string) *queue.Task {
@@ -572,7 +572,7 @@ func TestConcurrentWorkersRunInParallel(t *testing.T) {
 	}
 
 	be := &blockingExecutor{entered: make(chan int), release: make(chan struct{})}
-	w := New(q, be, github.NewWithBaseURL("t", srv.URL), template.NewLoader("sys"), &config.Config{Trigger: "@aizu"})
+	w := New(q, be, github.NewWithBaseURL("t", srv.URL, false), template.NewLoader("sys"), &config.Config{Trigger: "@aizu"})
 
 	var wg sync.WaitGroup
 	for i := 0; i < 2; i++ {

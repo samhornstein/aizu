@@ -51,6 +51,12 @@ func fakeClient(fn roundTripper) *Client {
 	return &Client{token: "test-token", http: &http.Client{Transport: fn}}
 }
 
+func fakeSignedClient(fn roundTripper) *Client {
+	c := fakeClient(fn)
+	c.signature = true
+	return c
+}
+
 func jsonResp(r *http.Request, status int, body string) *http.Response {
 	return &http.Response{
 		StatusCode: status,
@@ -231,6 +237,43 @@ func TestUpdateComment(t *testing.T) {
 		json.NewDecoder(r.Body).Decode(&payload)
 		if payload["body"] != "done\n\n"+ReplyMarker {
 			t.Errorf("body = %q, want marker-stamped %q", payload["body"], "done\n\n"+ReplyMarker)
+		}
+		return jsonResp(r, 200, `{}`), nil
+	})
+
+	if err := c.UpdateComment(context.Background(), "o/r", 123, "done"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateCommentWithSignature(t *testing.T) {
+	c := fakeSignedClient(func(r *http.Request) (*http.Response, error) {
+		var payload map[string]string
+		json.NewDecoder(r.Body).Decode(&payload)
+		want := "hello\n\n" + signatureLine + "\n\n" + ReplyMarker
+		if payload["body"] != want {
+			t.Errorf("body = %q, want %q", payload["body"], want)
+		}
+		return jsonResp(r, 201, `{"id":1}`), nil
+	})
+
+	if _, err := c.CreateComment(context.Background(), "o/r", 1, "hello"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Progress-comment edits replace the body wholesale, so the signature must
+// appear exactly once no matter how many times the comment is updated.
+func TestUpdateCommentWithSignature(t *testing.T) {
+	c := fakeSignedClient(func(r *http.Request) (*http.Response, error) {
+		var payload map[string]string
+		json.NewDecoder(r.Body).Decode(&payload)
+		want := "done\n\n" + signatureLine + "\n\n" + ReplyMarker
+		if payload["body"] != want {
+			t.Errorf("body = %q, want %q", payload["body"], want)
+		}
+		if strings.Count(payload["body"], signatureLine) != 1 {
+			t.Errorf("body = %q, want exactly one signature", payload["body"])
 		}
 		return jsonResp(r, 200, `{}`), nil
 	})

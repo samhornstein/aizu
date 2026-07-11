@@ -25,6 +25,7 @@ type Config struct {
 	// GitHub
 	GitHubToken string // personal access token (PAT)
 	BotUsername string // authenticated account login; comments from it are ignored (set at startup)
+	Signature   bool   // append the "Generated with Aizu" line to every reply
 
 	// Agent
 	Engine             string // preset name: pi | claude (see enginePresets)
@@ -74,6 +75,7 @@ func Load() *Config {
 	cfg := &Config{
 		RedisURL:       "redis://localhost:6379",
 		Trigger:        "aizu",
+		Signature:      true,
 		Engine:         "pi",
 		Timeout:        3600,
 		MaxRunsPerHour: 10,
@@ -110,6 +112,9 @@ func Load() *Config {
 	}
 	if v := os.Getenv("AIZU_ALLOW_ALL"); v != "" {
 		cfg.AllowAll, _ = strconv.ParseBool(v)
+	}
+	if v := os.Getenv("AIZU_SIGNATURE"); v != "" {
+		cfg.Signature, _ = strconv.ParseBool(v)
 	}
 	if v := os.Getenv("CONTAINER_IMAGE"); v != "" {
 		cfg.ContainerImage = v

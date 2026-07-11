@@ -56,6 +56,21 @@ func TestDefaults(t *testing.T) {
 	if cfg.PollInterval != 15*time.Second {
 		t.Errorf("PollInterval = %v, want 15s", cfg.PollInterval)
 	}
+	if !cfg.Signature {
+		t.Error("Signature = false, want true by default")
+	}
+}
+
+func TestSignatureOverride(t *testing.T) {
+	t.Setenv("AIZU_SIGNATURE", "false")
+	if Load().Signature {
+		t.Error("Signature = true, want false with AIZU_SIGNATURE=false")
+	}
+
+	t.Setenv("AIZU_SIGNATURE", "true")
+	if !Load().Signature {
+		t.Error("Signature = false, want true with AIZU_SIGNATURE=true")
+	}
 }
 
 func TestConcurrencyDefault(t *testing.T) {

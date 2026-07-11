@@ -33,6 +33,7 @@ type Config struct {
 	EngineLocalCommand string // variant used when a local model server is configured; {model} is substituted. Empty = always use EngineCommand.
 	Timeout            int    // agent run timeout, seconds
 	MaxRunsPerHour     int    // per-repo hourly cap on agent runs; 0 disables
+	Concurrency        int    // number of agent tasks run in parallel
 
 	// Poller
 	PollInterval time.Duration
@@ -76,6 +77,7 @@ func Load() *Config {
 		Engine:         "pi",
 		Timeout:        3600,
 		MaxRunsPerHour: 10,
+		Concurrency:    1,
 		PollInterval:   15 * time.Second,
 	}
 
@@ -124,6 +126,9 @@ func Load() *Config {
 	}
 	if n, ok := envInt("AIZU_MAX_RUNS_PER_HOUR"); ok {
 		cfg.MaxRunsPerHour = n
+	}
+	if n, ok := envInt("AIZU_CONCURRENCY"); ok && n > 0 {
+		cfg.Concurrency = n
 	}
 	if n, ok := envInt("POLL_INTERVAL"); ok && n > 0 {
 		cfg.PollInterval = time.Duration(n) * time.Second

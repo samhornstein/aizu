@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/samhornstein/aizu/internal/config"
@@ -494,6 +495,89 @@ func TestRateLimit(t *testing.T) {
 	if len(fs.posts) != postsBefore+1 {
 		t.Errorf("fourth task must not post; posts = %v", fs.posts)
 	}
+}
+
+// blockingExecutor parks every RunEngine call until release is closed, so a
+// test can observe how many runs are in flight at once.
+type blockingExecutor struct {
+	entered chan int
+	release chan struct{}
+}
+
+func (b *blockingExecutor) Create(repo, branch string, prNumber int) (string, error) {
+	return "sid", nil
+}
+func (b *blockingExecutor) RunEngine(sid, prompt string) (int, string, error) {
+	b.entered <- 1
+	<-b.release
+	return 0, "done", nil
+}
+func (b *blockingExecutor) ReadFile(sid, path string) (string, error) {
+	return "", errors.New("no file")
+}
+func (b *blockingExecutor) Destroy(sid string) {}
+func (b *blockingExecutor) CleanupStale()      {}
+
+// TestConcurrentWorkersRunInParallel: two Run goroutines sharing one Worker
+// process tasks for two different issues simultaneously, while the queue's
+// dedupe keeps a second task for an already-active issue out entirely.
+func TestConcurrentWorkersRunInParallel(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/issues/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodPost || r.Method == http.MethodPatch {
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": 1})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"number": 1, "title": "T"})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	mr := miniredis.RunT(t)
+	q := queue.New("redis://" + mr.Addr())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	for _, n := range []int{1, 2} {
+		if task, err := q.Enqueue(ctx, "o/r", n, 0, "@aizu go", "alice"); err != nil || task == nil {
+			t.Fatalf("enqueue issue %d: task=%v err=%v", n, task, err)
+		}
+	}
+	// Same-issue dedupe while queued.
+	if task, _ := q.Enqueue(ctx, "o/r", 1, 0, "@aizu again", "alice"); task != nil {
+		t.Fatal("second task for a queued issue must be rejected")
+	}
+
+	be := &blockingExecutor{entered: make(chan int), release: make(chan struct{})}
+	w := New(q, be, github.NewWithBaseURL("t", srv.URL), template.NewLoader("sys"), &config.Config{Trigger: "@aizu"})
+
+	var wg sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			w.Run(ctx)
+		}()
+	}
+
+	// Both tasks must be inside RunEngine at the same time.
+	for i := 0; i < 2; i++ {
+		select {
+		case <-be.entered:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("only %d task(s) entered RunEngine; want 2 concurrently", i)
+		}
+	}
+
+	// Same-issue dedupe while running.
+	if task, _ := q.Enqueue(ctx, "o/r", 1, 0, "@aizu again", "alice"); task != nil {
+		t.Error("second task for a running issue must be rejected")
+	}
+
+	close(be.release)
+	cancel()
+	wg.Wait()
 }
 
 func TestBuildPromptIssueBodyTrigger(t *testing.T) {

@@ -17,8 +17,8 @@ This page covers the settings that involve a trade-off worth understanding.
 - **`AIZU_REPOS`** — the repos to watch (`owner/repo`, comma-separated). Left
   empty, Aizu picks up every repo the token can access, which is rarely what you
   want; list them explicitly.
-- **`AIZU_USERS`** — in shared orgs, restrict who can trigger Aizu to avoid
-  accidental or unwanted runs. Empty allows everyone.
+- **`AIZU_USERS`** — an explicit allowlist of trigger authors, replacing the
+  default write-access check (see [Security](../security/)).
 - **`AIZU_TRIGGER`** — the keyword must appear at the **start** of the comment or
   issue body, so an incidental mention elsewhere in the text won't fire a run.
 
@@ -26,6 +26,10 @@ This page covers the settings that involve a trade-off worth understanding.
 
 - **`AIZU_TIMEOUT`** — defaults to a generous 1-hour limit for long agent runs;
   lower it (e.g. 300–600s) to fail fast on simple tasks.
+- **`AIZU_CONCURRENCY`** — how many agent tasks run in parallel (default 1).
+  Raise it for a shared instance so one long run doesn't queue everyone else —
+  each concurrent task launches its own container using up to 4 GB RAM /
+  2 CPUs. The same issue/PR never runs twice at once regardless.
 - **`AIZU_ENGINE`** — picks a coding-agent preset (`pi` default, `claude` for
   Claude Code); it sets the sandbox image and command for you.
 - **`ENGINE_COMMAND`** — overrides the preset's command, for custom agents.

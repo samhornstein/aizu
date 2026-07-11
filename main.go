@@ -98,12 +98,18 @@ func main() {
 		exec.CleanupStale()
 		q.RecoverStale(ctx)
 		loader := template.NewLoader(defaultInstructions)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			slog.Info("Worker started")
-			worker.New(q, exec, gh, loader, cfg).Run(ctx)
-		}()
+		// One shared Worker across goroutines: it is stateless per task, the
+		// queue's BRPOP hands each task to exactly one consumer, and the
+		// enqueue dedupe keeps at most one active task per issue/PR.
+		w := worker.New(q, exec, gh, loader, cfg)
+		for i := 0; i < cfg.Concurrency; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				w.Run(ctx)
+			}()
+		}
+		slog.Info("Worker started", "concurrency", cfg.Concurrency)
 	}
 
 	if mode == "all" || mode == "poller" {

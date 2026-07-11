@@ -40,7 +40,6 @@ its README index row in the same PR."*
 
 | Plan | Category | Severity / Value | Branch |
 |------|----------|------------------|--------|
-| [feat-worker-concurrency.md](feat-worker-concurrency.md) | Feature | Medium — run multiple agent tasks in parallel | `feat/worker-concurrency` |
 | [chore-code-quality.md](chore-code-quality.md) | Quality | Low — small cleanups and missing queue tests | `chore/code-quality` |
 
 ## Future ideas (not planned in detail)

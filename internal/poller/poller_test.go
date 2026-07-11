@@ -113,7 +113,7 @@ func newLivePoller(t *testing.T, cfg *config.Config, handler http.Handler) (*Pol
 	q := queue.New("redis://" + mr.Addr())
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	return New(cfg, github.NewWithBaseURL("test-token", srv.URL), q), q
+	return New(cfg, github.NewWithBaseURL("test-token", srv.URL, false), q), q
 }
 
 func queueLen(t *testing.T, q *queue.Queue) int64 {

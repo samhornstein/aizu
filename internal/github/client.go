@@ -24,11 +24,17 @@ const apiBase = "https://api.github.com"
 // token possible.
 const ReplyMarker = "<!-- aizu-reply -->"
 
+// signatureLine is the visible attribution appended to replies when the
+// signature is enabled. Unlike ReplyMarker it plays no part in loop
+// prevention — it is there for readers of the thread.
+const signatureLine = "🤖 Generated with [Aizu](https://github.com/samhornstein/aizu)"
+
 // Client talks to the GitHub REST API with a fixed bearer token.
 type Client struct {
-	token   string
-	http    *http.Client
-	baseURL string // empty = use apiBase; set in tests to redirect to a fake server
+	token     string
+	http      *http.Client
+	baseURL   string // empty = use apiBase; set in tests to redirect to a fake server
+	signature bool   // append signatureLine to every posted comment
 }
 
 func (c *Client) base() string {
@@ -39,15 +45,16 @@ func (c *Client) base() string {
 }
 
 // New returns a Client. An empty token yields unauthenticated requests, which
-// GitHub heavily rate-limits — a PAT is expected in practice.
-func New(token string) *Client {
-	return &Client{token: token, http: &http.Client{Timeout: 15 * time.Second}}
+// GitHub heavily rate-limits — a PAT is expected in practice. signature
+// controls whether posted comments carry the visible attribution line.
+func New(token string, signature bool) *Client {
+	return &Client{token: token, http: &http.Client{Timeout: 15 * time.Second}, signature: signature}
 }
 
 // NewWithBaseURL returns a Client that sends all requests to baseURL instead of
 // the production GitHub API. Intended for tests only.
-func NewWithBaseURL(token, baseURL string) *Client {
-	return &Client{token: token, http: &http.Client{Timeout: 15 * time.Second}, baseURL: baseURL}
+func NewWithBaseURL(token, baseURL string, signature bool) *Client {
+	return &Client{token: token, http: &http.Client{Timeout: 15 * time.Second}, baseURL: baseURL, signature: signature}
 }
 
 // User is the subset of a GitHub user we care about.
@@ -206,7 +213,7 @@ func (c *Client) CreateComment(ctx context.Context, repoFull string, number int,
 		ID int64 `json:"id"`
 	}
 	u := fmt.Sprintf("%s/repos/%s/issues/%d/comments", c.base(), repoFull, number)
-	if err := c.post(ctx, u, map[string]string{"body": stampReply(body)}, &out); err != nil {
+	if err := c.post(ctx, u, map[string]string{"body": c.stampReply(body)}, &out); err != nil {
 		return 0, err
 	}
 	return out.ID, nil
@@ -216,11 +223,15 @@ func (c *Client) CreateComment(ctx context.Context, repoFull string, number int,
 // here too, so an edited comment stays recognizable as Aizu's own.
 func (c *Client) UpdateComment(ctx context.Context, repoFull string, commentID int64, body string) error {
 	u := fmt.Sprintf("%s/repos/%s/issues/comments/%d", c.base(), repoFull, commentID)
-	return c.send(ctx, http.MethodPatch, u, map[string]string{"body": stampReply(body)}, nil)
+	return c.send(ctx, http.MethodPatch, u, map[string]string{"body": c.stampReply(body)}, nil)
 }
 
-func stampReply(body string) string {
-	return strings.TrimRight(body, "\n") + "\n\n" + ReplyMarker
+func (c *Client) stampReply(body string) string {
+	body = strings.TrimRight(body, "\n")
+	if c.signature {
+		body += "\n\n" + signatureLine
+	}
+	return body + "\n\n" + ReplyMarker
 }
 
 // ListIssues returns open issues (including PRs) across the repo updated at

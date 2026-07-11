@@ -50,7 +50,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	gh := github.New(cfg.GitHubToken)
+	gh := github.New(cfg.GitHubToken, cfg.Signature)
 	q := queue.New(cfg.RedisURL)
 
 	ctx, cancel := context.WithCancel(context.Background())

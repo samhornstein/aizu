@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -114,10 +115,11 @@ func queueLen(t *testing.T, q *queue.Queue) int64 {
 func popAndComplete(t *testing.T, q *queue.Queue) *queue.Task {
 	t.Helper()
 	ctx := context.Background()
-	id, err := q.Client().RPop(ctx, "aizu:tasks").Result()
+	payload, err := q.Client().RPop(ctx, "aizu:tasks").Result()
 	if err != nil {
 		t.Fatalf("RPOP: %v", err)
 	}
+	id, _, _ := strings.Cut(payload, "|") // list entries are "<taskID>|<repo#number>"
 	data, err := q.Client().Get(ctx, "aizu:task:"+id).Result()
 	if err != nil {
 		t.Fatalf("GET task: %v", err)

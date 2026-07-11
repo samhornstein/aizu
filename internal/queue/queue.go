@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -73,6 +74,28 @@ func activeKey(repo string, number int) string {
 	return fmt.Sprintf("%s#%d", repo, number)
 }
 
+// listPayload encodes a queue-list entry as "<taskID>|<repo#number>" so that
+// NextPending can clean up the queued-set entry even when the task JSON has
+// expired (the repo/number would otherwise be unknowable).
+func listPayload(task *Task) string {
+	return task.ID + "|" + activeKey(task.Repo, task.Number)
+}
+
+// RecoverStale clears queue state that only a previous process can have left
+// behind: tasks die with the process that ran them, but their entries in the
+// running set do not — and a leftover entry blocks all future triggers for
+// that issue/PR. Call once at startup, before any worker goroutine consumes.
+// Deleting the whole set assumes all workers live in this one process; if
+// Aizu ever runs multiple worker processes against one Redis, this must
+// become a per-worker lease.
+func (q *Queue) RecoverStale(ctx context.Context) {
+	if n, err := q.rdb.Del(ctx, runningKey).Result(); err != nil {
+		slog.Warn("Could not clear running set", "error", err)
+	} else if n > 0 {
+		slog.Info("Cleared stale running set from previous run")
+	}
+}
+
 // Enqueue atomically checks whether the issue/PR already has an active task and,
 // if not, creates and queues a new one. Returns (nil, nil) if skipped because
 // a task is already running or queued for that issue/PR.
@@ -91,7 +114,7 @@ func (q *Queue) Enqueue(ctx context.Context, repo string, number int, commentID 
 	}
 	result, err := q.rdb.Eval(ctx, enqueueScript,
 		[]string{activeKey(repo, number), runningKey, queuedKey, queueKey, taskPrefix + task.ID},
-		task.ID, string(data), int(taskTTL.Seconds()),
+		listPayload(task), string(data), int(taskTTL.Seconds()),
 	).Int()
 	if err != nil {
 		return nil, fmt.Errorf("enqueue script: %w", err)
@@ -113,7 +136,7 @@ func (q *Queue) push(ctx context.Context, task *Task) error {
 	if err := q.rdb.Set(ctx, taskPrefix+task.ID, data, taskTTL).Err(); err != nil {
 		return fmt.Errorf("store task: %w", err)
 	}
-	if err := q.rdb.LPush(ctx, queueKey, task.ID).Err(); err != nil {
+	if err := q.rdb.LPush(ctx, queueKey, listPayload(task)).Err(); err != nil {
 		return fmt.Errorf("enqueue task: %w", err)
 	}
 	q.rdb.SAdd(ctx, queuedKey, activeKey(task.Repo, task.Number))
@@ -131,11 +154,16 @@ func (q *Queue) NextPending(ctx context.Context, timeout time.Duration) (*Task, 
 		return nil, fmt.Errorf("brpop: %w", err)
 	}
 
-	id := res[1]
+	// Payload is "<taskID>|<repo#number>"; tolerate bare IDs left in Redis by
+	// versions that predate the separator.
+	id, active, hasActive := strings.Cut(res[1], "|")
 	data, err := q.rdb.Get(ctx, taskPrefix+id).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			slog.Warn("Task expired or missing", "id", id)
+			if hasActive {
+				q.rdb.SRem(ctx, queuedKey, active)
+			}
 			return nil, nil
 		}
 		return nil, fmt.Errorf("get task: %w", err)

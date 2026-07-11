@@ -75,6 +75,7 @@ func main() {
 	if mode == "all" || mode == "worker" {
 		exec := executor.New(cfg)
 		exec.CleanupStale()
+		q.RecoverStale(ctx)
 		loader := template.NewLoader(defaultInstructions)
 		wg.Add(1)
 		go func() {

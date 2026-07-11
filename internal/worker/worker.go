@@ -80,21 +80,27 @@ func (w *Worker) handle(ctx context.Context, task *queue.Task, log *slog.Logger)
 	}
 
 	branch := ""
+	prNumber := 0
+	isFork := false
 	if issue.IsPR() {
 		pr, err := w.gh.GetPullRequest(ctx, task.Repo, task.Number)
 		if err != nil {
 			return "", fmt.Errorf("fetch pull request: %w", err)
 		}
 		branch = pr.Head.Ref
+		prNumber = pr.Number
+		// An empty FullName means the head repo is gone (deleted fork) —
+		// unpushable either way.
+		isFork = pr.Head.Repo.FullName == "" || pr.Head.Repo.FullName != task.Repo
 	}
 
-	sid, err := w.exec.Create(task.Repo, branch)
+	sid, err := w.exec.Create(task.Repo, branch, prNumber)
 	if err != nil {
 		return "", fmt.Errorf("create sandbox: %w", err)
 	}
 	defer w.exec.Destroy(sid)
 
-	prompt := w.buildPrompt(sid, issue, task)
+	prompt := w.buildPrompt(sid, issue, task, isFork)
 	exitCode, output, err := w.exec.RunEngine(sid, prompt)
 	if err != nil {
 		return "", fmt.Errorf("run engine: %w", err)
@@ -107,8 +113,10 @@ func (w *Worker) handle(ctx context.Context, task *queue.Task, log *slog.Logger)
 	return formatResult(output), nil
 }
 
-// buildPrompt assembles the instructions and GitHub context into the engine prompt.
-func (w *Worker) buildPrompt(sid string, issue *github.Issue, task *queue.Task) string {
+// buildPrompt assembles the instructions and GitHub context into the engine
+// prompt. isFork marks PRs whose head lives in another repo, which the bot
+// token cannot push to.
+func (w *Worker) buildPrompt(sid string, issue *github.Issue, task *queue.Task, isFork bool) string {
 	kind := "issue"
 	if issue.IsPR() {
 		kind = "pull request"
@@ -131,6 +139,9 @@ func (w *Worker) buildPrompt(sid string, issue *github.Issue, task *queue.Task) 
 		fmt.Fprintf(&b, "Title: %s\n", issue.Title)
 		fmt.Fprintf(&b, "The request from @%s in the %s body:\n", task.Author, kind)
 		fmt.Fprintf(&b, "%s\n", truncate(strings.TrimSpace(issue.Body), 4000))
+	}
+	if issue.IsPR() && isFork {
+		b.WriteString("\nNote: this pull request comes from a fork. You cannot push to its branch. Do not attempt to push; instead, describe the changes you would make, or include a patch in your reply.\n")
 	}
 	return b.String()
 }

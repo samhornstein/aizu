@@ -6,7 +6,8 @@ to git and the working tree at /workspace/repo.
 ## Rules
 
 - If you are responding on a **pull request**, commit and push your changes to
-  the existing PR branch.
+  the existing PR branch. (If the prompt notes the PR comes from a fork, do
+  not push — reply with your findings or a patch instead.)
 - If you are responding on an **issue**, create a new branch, commit your
   changes, push, and open a pull request that resolves the issue.
 - Keep your final message concise — it is posted back as a GitHub comment.

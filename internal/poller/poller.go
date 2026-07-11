@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -35,6 +36,10 @@ const seenTTL = 30 * 24 * time.Hour
 // once, then at most once per interval, instead of every poll tick.
 const errLogInterval = 10 * time.Minute
 
+// permTTL bounds how long a cached permission decision is trusted; revoking
+// someone's access takes effect within this window.
+const permTTL = 10 * time.Minute
+
 // Poller polls GitHub and enqueues triggered comments.
 type Poller struct {
 	cfg *config.Config
@@ -45,11 +50,28 @@ type Poller struct {
 	// lastErrLog tracks when each repo's poll failure was last logged, for
 	// throttling. Only touched from the single Run goroutine.
 	lastErrLog map[string]time.Time
+
+	// perms caches repo-permission lookups (key: repo+"/"+login) so repeat
+	// authors don't cost an API call per comment.
+	permsMu sync.Mutex
+	perms   map[string]permCacheEntry
+}
+
+type permCacheEntry struct {
+	allowed bool
+	expires time.Time
 }
 
 // New constructs a Poller.
 func New(cfg *config.Config, gh *github.Client, q *queue.Queue) *Poller {
-	return &Poller{cfg: cfg, gh: gh, q: q, rdb: q.Client(), lastErrLog: make(map[string]time.Time)}
+	return &Poller{
+		cfg:        cfg,
+		gh:         gh,
+		q:          q,
+		rdb:        q.Client(),
+		lastErrLog: make(map[string]time.Time),
+		perms:      make(map[string]permCacheEntry),
+	}
 }
 
 // Run polls on the configured interval until ctx is cancelled.
@@ -99,7 +121,7 @@ func (p *Poller) pollRepo(ctx context.Context, repo string) error {
 	}
 
 	for _, c := range comments {
-		if !p.shouldTrigger(repo, c) {
+		if !p.shouldTrigger(ctx, repo, c) {
 			continue
 		}
 		number := c.IssueNumber()
@@ -145,8 +167,7 @@ func (p *Poller) pollIssues(ctx context.Context, repo string) error {
 		if !p.triggered(issue.Body) {
 			continue
 		}
-		if len(p.cfg.Users) > 0 && !contains(p.cfg.Users, issue.User.Login) {
-			slog.Info("Ignoring issue from non-allowlisted user", "repo", repo, "user", issue.User.Login)
+		if !p.authorized(ctx, repo, issue.User.Login) {
 			continue
 		}
 		seenKey := fmt.Sprintf("%s%s#%d", seenIssuePrefix, repo, issue.Number)
@@ -211,21 +232,56 @@ func (p *Poller) triggered(text string) bool {
 	return strings.HasPrefix(strings.TrimSpace(text), p.cfg.Trigger)
 }
 
-// shouldTrigger applies the self/keyword/allowlist filters. Aizu's own
+// shouldTrigger applies the self/keyword/authorization filters. Aizu's own
 // replies are recognized by the ReplyMarker they carry, not by author, so a
-// personal token (whose login equals the triggering user's) works.
-func (p *Poller) shouldTrigger(repo string, c github.Comment) bool {
+// personal token (whose login equals the triggering user's) works. The free
+// checks run before authorized, which may cost an API call.
+func (p *Poller) shouldTrigger(ctx context.Context, repo string, c github.Comment) bool {
 	if strings.Contains(c.Body, github.ReplyMarker) {
 		return false // one of our own replies
 	}
 	if !p.triggered(c.Body) {
 		return false
 	}
-	if len(p.cfg.Users) > 0 && !contains(p.cfg.Users, c.User.Login) {
-		slog.Info("Ignoring comment from non-allowlisted user", "repo", repo, "user", c.User.Login)
+	return p.authorized(ctx, repo, c.User.Login)
+}
+
+// authorized reports whether login may trigger Aizu on repo. With an
+// explicit AIZU_USERS allowlist, membership decides. With AIZU_ALLOW_ALL,
+// anyone may. Otherwise the user must have write or admin permission on the
+// repo — the safe default for public repos, where a trigger runs an agent on
+// the operator's machine. Errors fail closed.
+func (p *Poller) authorized(ctx context.Context, repo, login string) bool {
+	if len(p.cfg.Users) > 0 {
+		if contains(p.cfg.Users, login) {
+			return true
+		}
+		slog.Info("Ignoring trigger from non-allowlisted user", "repo", repo, "user", login)
 		return false
 	}
-	return true
+	if p.cfg.AllowAll {
+		return true
+	}
+
+	key := repo + "/" + login
+	p.permsMu.Lock()
+	entry, ok := p.perms[key]
+	p.permsMu.Unlock()
+	if !ok || time.Now().After(entry.expires) {
+		perm, err := p.gh.Permission(ctx, repo, login)
+		if err != nil {
+			slog.Warn("Could not check repo permission; denying trigger", "repo", repo, "user", login, "error", err)
+			return false
+		}
+		entry = permCacheEntry{allowed: perm == "admin" || perm == "write", expires: time.Now().Add(permTTL)}
+		p.permsMu.Lock()
+		p.perms[key] = entry
+		p.permsMu.Unlock()
+	}
+	if !entry.allowed {
+		slog.Info("Ignoring trigger from user without write access", "repo", repo, "user", login)
+	}
+	return entry.allowed
 }
 
 func (p *Poller) lastSince(ctx context.Context, repo string) time.Time {

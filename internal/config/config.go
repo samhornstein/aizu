@@ -15,9 +15,10 @@ type Config struct {
 	RedisURL string
 
 	// Trigger
-	Trigger string   // keyword that fires the agent; must begin the comment, e.g. "aizu"
-	Repos   []string // "owner/repo" list; empty means auto-discover the token owner's repos
-	Users   []string // allowlisted comment authors; empty means allow everyone
+	Trigger  string   // keyword that fires the agent; must begin the comment, e.g. "aizu"
+	Repos    []string // "owner/repo" list; empty means auto-discover the token owner's repos
+	Users    []string // explicit allowlist of trigger authors; empty defers to repo permissions
+	AllowAll bool     // DANGER: let anyone who can comment trigger the agent
 
 	// GitHub
 	GitHubToken string // personal access token (PAT)
@@ -62,6 +63,9 @@ func Load() *Config {
 	}
 	if v := envList("AIZU_USERS"); v != nil {
 		cfg.Users = v
+	}
+	if v := os.Getenv("AIZU_ALLOW_ALL"); v != "" {
+		cfg.AllowAll, _ = strconv.ParseBool(v)
 	}
 	if v := os.Getenv("CONTAINER_IMAGE"); v != "" {
 		cfg.ContainerImage = v

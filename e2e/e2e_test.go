@@ -64,6 +64,13 @@ func TestPipeline(t *testing.T) {
 		}
 	})
 
+	// The collaborator gate consults this before enqueueing; without it the
+	// trigger would be denied (which is itself proof the gate is on).
+	mux.HandleFunc("/repos/o/r/collaborators/alice/permission", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"permission": "write"}) //nolint:errcheck
+	})
+
 	mux.HandleFunc("/repos/o/r/issues/1", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{

@@ -169,3 +169,84 @@ func TestAllowRunDisabled(t *testing.T) {
 		}
 	}
 }
+
+func TestEnqueueDuplicateWhileQueued(t *testing.T) {
+	q, _ := newTestQueue(t)
+	ctx := context.Background()
+
+	if task, err := q.Enqueue(ctx, "o/r", 1, 100, "@aizu go", "alice"); err != nil || task == nil {
+		t.Fatalf("first Enqueue: task=%v err=%v", task, err)
+	}
+	if task, err := q.Enqueue(ctx, "o/r", 1, 101, "@aizu again", "bob"); err != nil || task != nil {
+		t.Errorf("duplicate Enqueue = (%v, %v), want (nil, nil)", task, err)
+	}
+	// A different issue is independent.
+	if task, err := q.Enqueue(ctx, "o/r", 2, 102, "@aizu go", "alice"); err != nil || task == nil {
+		t.Errorf("Enqueue for another issue = (%v, %v), want a task", task, err)
+	}
+}
+
+func TestMarkDoneAllowsReEnqueue(t *testing.T) {
+	q, _ := newTestQueue(t)
+	ctx := context.Background()
+
+	if _, err := q.Enqueue(ctx, "o/r", 1, 100, "@aizu go", "alice"); err != nil {
+		t.Fatal(err)
+	}
+	task, err := q.NextPending(ctx, time.Second)
+	if err != nil || task == nil {
+		t.Fatalf("NextPending: task=%v err=%v", task, err)
+	}
+	q.MarkDone(ctx, task)
+
+	if again, err := q.Enqueue(ctx, "o/r", 1, 101, "@aizu more", "alice"); err != nil || again == nil {
+		t.Errorf("Enqueue after MarkDone = (%v, %v), want a task", again, err)
+	}
+}
+
+func TestMarkFailedRetriesThenDeadLetters(t *testing.T) {
+	orig := retryDelay
+	retryDelay = 10 * time.Millisecond
+	defer func() { retryDelay = orig }()
+
+	q, _ := newTestQueue(t)
+	ctx := context.Background()
+
+	if _, err := q.Enqueue(ctx, "o/r", 1, 100, "@aizu go", "alice"); err != nil {
+		t.Fatal(err)
+	}
+	task, err := q.NextPending(ctx, time.Second)
+	if err != nil || task == nil {
+		t.Fatalf("NextPending: task=%v err=%v", task, err)
+	}
+
+	if !q.MarkFailed(ctx, task) {
+		t.Fatal("first MarkFailed should re-queue")
+	}
+	retry, err := q.NextPending(ctx, time.Second)
+	if err != nil || retry == nil {
+		t.Fatalf("NextPending after retry: task=%v err=%v", retry, err)
+	}
+	if retry.Retries != 1 {
+		t.Errorf("retried task Retries = %d, want 1", retry.Retries)
+	}
+
+	if q.MarkFailed(ctx, retry) {
+		t.Fatal("MarkFailed at the limit should dead-letter, not re-queue")
+	}
+	n, err := q.Client().LLen(ctx, "aizu:failed").Result()
+	if err != nil || n != 1 {
+		t.Errorf("dead-letter list len = %d (err %v), want 1", n, err)
+	}
+	if more, _ := q.NextPending(ctx, 50*time.Millisecond); more != nil {
+		t.Errorf("dead-lettered task must not come back; got %+v", more)
+	}
+}
+
+func TestNextPendingTimesOutEmpty(t *testing.T) {
+	q, _ := newTestQueue(t)
+	task, err := q.NextPending(context.Background(), 50*time.Millisecond)
+	if err != nil || task != nil {
+		t.Errorf("NextPending(empty) = (%v, %v), want (nil, nil)", task, err)
+	}
+}

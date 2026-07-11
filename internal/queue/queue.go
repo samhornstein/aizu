@@ -23,8 +23,10 @@ const (
 
 	maxRetries = 1
 	taskTTL    = 24 * time.Hour
-	retryDelay = 5 * time.Second
 )
+
+// retryDelay is a var so tests can shrink the backoff.
+var retryDelay = 5 * time.Second
 
 // enqueueScript atomically checks whether the issue/PR is already active and,
 // if not, stores the task JSON and appends its ID to the queue list.

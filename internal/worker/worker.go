@@ -5,6 +5,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -97,6 +98,14 @@ func (w *Worker) process(ctx context.Context, task *queue.Task) {
 	}
 
 	output, err := w.handle(ctx, task, log)
+	if errors.Is(err, errClosedIssue) {
+		// A normal outcome, not a failure: no retry, no 😕. The placeholder
+		// is already up, so edit it rather than leave "working on this…".
+		log.Info("Issue is closed; skipping")
+		w.reply(ctx, task, placeholderID, "This issue is closed — Aizu skipped it. Reopen it and trigger again to run.", log)
+		w.q.MarkDone(ctx, task)
+		return
+	}
 	if err != nil {
 		log.Error("Task failed", "error", err)
 		if !w.q.MarkFailed(ctx, task) {
@@ -139,11 +148,18 @@ func helpText(trigger string) string {
 		trigger)
 }
 
+// errClosedIssue marks a task skipped because its issue/PR is closed; it is
+// a normal outcome, not a failure.
+var errClosedIssue = errors.New("issue is closed")
+
 // handle runs the agent in a sandbox and returns the message to post back.
 func (w *Worker) handle(ctx context.Context, task *queue.Task, log *slog.Logger) (string, error) {
 	issue, err := w.gh.GetIssue(ctx, task.Repo, task.Number)
 	if err != nil {
 		return "", fmt.Errorf("fetch issue: %w", err)
+	}
+	if issue.State == "closed" {
+		return "", errClosedIssue
 	}
 
 	branch := ""

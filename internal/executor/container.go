@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +19,31 @@ import (
 
 type containerExecutor struct {
 	cfg *config.Config
+
+	// models caches the discovered local model ID per sandbox, so a task
+	// costs one /models request instead of one in Create and another in
+	// RunEngine. Mutex-guarded: workers run concurrently.
+	mu     sync.Mutex
+	models map[string]string
+}
+
+// modelID returns the local model server's model ID for this sandbox,
+// discovering it on first use.
+func (e *containerExecutor) modelID(sid string) (string, error) {
+	e.mu.Lock()
+	id, ok := e.models[sid]
+	e.mu.Unlock()
+	if ok {
+		return id, nil
+	}
+	id, err := discoverModelID(e.cfg.OpenAIBaseURL)
+	if err != nil {
+		return "", err
+	}
+	e.mu.Lock()
+	e.models[sid] = id
+	e.mu.Unlock()
+	return id, nil
 }
 
 // credentialHelper authenticates git against GitHub using the GITHUB_TOKEN
@@ -83,7 +109,7 @@ func (e *containerExecutor) writeModelsJSON(sid string) error {
 	if e.cfg.OpenAIBaseURL == "" || (e.cfg.Engine != "" && e.cfg.Engine != "pi") {
 		return nil
 	}
-	modelID, err := discoverModelID(e.cfg.OpenAIBaseURL)
+	modelID, err := e.modelID(sid)
 	if err != nil {
 		return fmt.Errorf("discover model: %w", err)
 	}
@@ -151,7 +177,7 @@ func (e *containerExecutor) RunEngine(sid, prompt string) (int, string, error) {
 		return 1, "", fmt.Errorf("write prompt: %w", err)
 	}
 
-	command, err := resolveEngineCommand(e.cfg, discoverModelID)
+	command, err := resolveEngineCommand(e.cfg, func(string) (string, error) { return e.modelID(sid) })
 	if err != nil {
 		return 1, "", err
 	}
@@ -181,6 +207,9 @@ func (e *containerExecutor) ReadFile(sid, path string) (string, error) {
 }
 
 func (e *containerExecutor) Destroy(sid string) {
+	e.mu.Lock()
+	delete(e.models, sid)
+	e.mu.Unlock()
 	_, _ = run(fmt.Sprintf("docker rm -f %s", shellQuote(sid)), 0)
 	slog.Info("Destroyed container", "sid", sid)
 }

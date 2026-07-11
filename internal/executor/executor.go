@@ -25,5 +25,5 @@ type Executor interface {
 
 // New returns the default (Docker container) executor.
 func New(cfg *config.Config) Executor {
-	return &containerExecutor{cfg: cfg}
+	return &containerExecutor{cfg: cfg, models: make(map[string]string)}
 }

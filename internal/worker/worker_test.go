@@ -309,7 +309,8 @@ type feedbackServer struct {
 	reactions     []string
 	posts         []string
 	patches       map[int64]string
-	failFirstPost bool // 500 the first comment POST (the placeholder)
+	failFirstPost bool   // 500 the first comment POST (the placeholder)
+	issueState    string // issue state served by GET; empty = open
 	postsSeen     int
 	nextID        int64
 }
@@ -320,7 +321,7 @@ func newFeedbackServer(t *testing.T) (*feedbackServer, *httptest.Server) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/o/r/issues/9", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"number": 9, "title": "T"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"number": 9, "title": "T", "state": fs.issueState})
 	})
 	mux.HandleFunc("/repos/o/r/issues/comments/777/reactions", func(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]string
@@ -494,6 +495,27 @@ func TestRateLimit(t *testing.T) {
 	w.process(ctx, commentTask("t4"))
 	if len(fs.posts) != postsBefore+1 {
 		t.Errorf("fourth task must not post; posts = %v", fs.posts)
+	}
+}
+
+// TestClosedIssueSkipped: a trigger on a closed issue must not run the
+// engine or count as a failure; the placeholder is edited into a skip note.
+func TestClosedIssueSkipped(t *testing.T) {
+	fs, srv := newFeedbackServer(t)
+	fs.issueState = "closed"
+	exec := &mockExecutor{fileErr: errors.New("no file"), engineOut: "should not run"}
+	w := newFeedbackWorker(t, srv, exec, &config.Config{Trigger: "@aizu"})
+
+	w.process(context.Background(), commentTask("t1"))
+
+	if exec.gotPrompt != "" {
+		t.Error("closed issue must not run the engine")
+	}
+	if got := fs.patches[101]; !strings.Contains(got, "closed") {
+		t.Errorf("placeholder should be edited into the skip note; patches = %v", fs.patches)
+	}
+	if slices.Contains(fs.reactions, "confused") {
+		t.Error("a closed-issue skip is not a failure; no 😕 reaction")
 	}
 }
 

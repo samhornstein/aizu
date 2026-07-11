@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -12,16 +14,28 @@ import (
 
 const promptFile = "/tmp/.aizu-prompt"
 
-// run executes a shell command on the host, optionally wrapped in `timeout`.
+// errTimedOut reports that a command was killed by its timeout.
+var errTimedOut = errors.New("command timed out")
+
+// run executes a shell command on the host. If timeout > 0 the command is
+// killed when it elapses and the returned error wraps errTimedOut.
 func run(cmd string, timeout time.Duration) (string, error) {
 	slog.Debug("exec", "cmd", cmd)
-	var c *exec.Cmd
+	ctx := context.Background()
 	if timeout > 0 {
-		c = exec.Command("sh", "-c", fmt.Sprintf("timeout %d sh -c %s", int(timeout.Seconds()), shellQuote(cmd)))
-	} else {
-		c = exec.Command("sh", "-c", cmd)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
 	}
+	c := exec.CommandContext(ctx, "sh", "-c", cmd)
+	// Without WaitDelay, CombinedOutput blocks until every process holding
+	// the output pipe exits — a grandchild of sh can outlive the kill and
+	// stall the timeout for the child's full duration.
+	c.WaitDelay = time.Second
 	out, err := c.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return string(out), fmt.Errorf("%w after %s", errTimedOut, timeout)
+	}
 	return string(out), err
 }
 

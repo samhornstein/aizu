@@ -3,6 +3,7 @@ package executor
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -138,12 +139,14 @@ func (e *containerExecutor) RunEngine(sid, prompt string) (int, string, error) {
 
 	output, err := e.exec(sid, full, time.Duration(e.cfg.Timeout)*time.Second)
 	if err != nil {
-		if _, ok := err.(*exec.ExitError); ok {
-			return 1, output, nil
-		}
-		if strings.Contains(err.Error(), "signal: killed") {
+		// Timeout must be checked before ExitError: a killed process also
+		// yields an ExitError, which would otherwise mask the timeout.
+		if errors.Is(err, errTimedOut) {
 			slog.Warn("Engine timed out", "timeout", e.cfg.Timeout, "sid", sid)
 			return 124, fmt.Sprintf("Timed out after %ds", e.cfg.Timeout), nil
+		}
+		if _, ok := err.(*exec.ExitError); ok {
+			return 1, output, nil
 		}
 		return 1, output, err
 	}

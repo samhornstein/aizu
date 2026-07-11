@@ -1,11 +1,56 @@
 package executor
 
 import (
+	"errors"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/samhornstein/aizu/internal/config"
 )
+
+func TestRunTimesOut(t *testing.T) {
+	start := time.Now()
+	_, err := run("sleep 5", 100*time.Millisecond)
+	if !errors.Is(err, errTimedOut) {
+		t.Fatalf("run() error = %v, want errTimedOut", err)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Errorf("run() took %s, want well under the command's 5s sleep", elapsed)
+	}
+}
+
+func TestRunSucceedsWithinTimeout(t *testing.T) {
+	out, err := run("echo hi", time.Second)
+	if err != nil {
+		t.Fatalf("run() error = %v, want nil", err)
+	}
+	if out != "hi\n" {
+		t.Errorf("run() output = %q, want %q", out, "hi\n")
+	}
+}
+
+func TestRunExitErrorIsNotTimeout(t *testing.T) {
+	_, err := run("exit 3", time.Second)
+	if errors.Is(err, errTimedOut) {
+		t.Fatal("run() reported timeout for a plain non-zero exit")
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("run() error = %v, want *exec.ExitError", err)
+	}
+}
+
+func TestRunNoTimeout(t *testing.T) {
+	out, err := run("echo hi", 0)
+	if err != nil {
+		t.Fatalf("run() error = %v, want nil", err)
+	}
+	if out != "hi\n" {
+		t.Errorf("run() output = %q, want %q", out, "hi\n")
+	}
+}
 
 func TestShellQuote(t *testing.T) {
 	cases := []struct {

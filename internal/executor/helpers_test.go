@@ -116,9 +116,10 @@ func TestEnvExportsIncludesSetKeys(t *testing.T) {
 	cfg := &config.Config{
 		AnthropicKey: "sk-ant",
 		OpenAIKey:    "sk-oai",
+		GitHubToken:  "ghp_test",
 	}
 	out := envExports(cfg)
-	for _, want := range []string{"ANTHROPIC_API_KEY=", "OPENAI_API_KEY="} {
+	for _, want := range []string{"ANTHROPIC_API_KEY=", "OPENAI_API_KEY=", "GITHUB_TOKEN=", "GH_TOKEN="} {
 		if !strings.Contains(out, want) {
 			t.Errorf("envExports missing %q; got: %s", want, out)
 		}
@@ -128,7 +129,7 @@ func TestEnvExportsIncludesSetKeys(t *testing.T) {
 func TestEnvExportsOmitsEmptyKeys(t *testing.T) {
 	cfg := &config.Config{} // all keys empty
 	out := envExports(cfg)
-	for _, absent := range []string{"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "MODEL_SERVER_HOST"} {
+	for _, absent := range []string{"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GITHUB_TOKEN", "GH_TOKEN", "MODEL_SERVER_HOST"} {
 		if strings.Contains(out, absent) {
 			t.Errorf("envExports should omit unset key %q; got: %s", absent, out)
 		}

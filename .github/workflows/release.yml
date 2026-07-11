@@ -26,6 +26,15 @@ jobs:
         with:
           fetch-depth: 0 # full history + tags for the changelog and version bump
 
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      # Insurance: never tag a commit whose tests don't pass, even if it
+      # somehow reached main.
+      - name: Test
+        run: go test ./...
+
       - name: Install git-cliff
         uses: taiki-e/install-action@v2
         with:

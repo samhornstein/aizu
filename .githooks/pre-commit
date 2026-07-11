@@ -9,7 +9,8 @@ if [ -n "$unformatted" ]; then
     exit 1
 fi
 
-# Lint (mirrors the CI lint step).
+# Lint (mirrors the CI lint step; CI pins the version — see
+# .github/workflows/ci.yml — keep the local install roughly in sync).
 if ! command -v golangci-lint > /dev/null 2>&1; then
     echo "error: golangci-lint not found (install: https://golangci-lint.run/welcome/install/)"
     exit 1
@@ -17,4 +18,5 @@ fi
 golangci-lint run
 
 # Run unit tests (skip e2e tests which require external services).
-go test ./...
+# -race matches CI so local green means CI green.
+go test -race ./...

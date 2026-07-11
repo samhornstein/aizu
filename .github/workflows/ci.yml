@@ -5,9 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+# Superseded runs on the same branch are cancelled — agents push in bursts.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
@@ -18,16 +24,25 @@ jobs:
       - name: Format check
         run: test -z "$(gofmt -l .)"
 
+      - name: go.mod tidy check
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum || {
+            echo "::error::go.mod/go.sum are not tidy — run: go mod tidy"; exit 1; }
+
       - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          # Pinned so unrelated PRs can't break on a new linter release.
+          # Keep in sync with the local install (.githooks/pre-commit).
+          version: v2.12.2
 
       - name: Test
         run: go test -race ./...
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     services:
       redis:
         image: redis:7-alpine
@@ -49,3 +64,17 @@ jobs:
         run: go test -tags e2e -race -timeout 60s ./e2e/...
         env:
           REDIS_URL: redis://localhost:6379/1
+
+  # Both Dockerfiles must stay buildable; nothing else exercises them until
+  # release time.
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build aizu image
+        run: docker build -t aizu:ci .
+
+      - name: Build agent image
+        run: docker build -t aizu-agent:ci templates/pi

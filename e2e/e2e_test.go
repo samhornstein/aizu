@@ -41,9 +41,11 @@ func TestPipeline(t *testing.T) {
 
 	mux := http.NewServeMux()
 
+	// Single-account mode: the token belongs to the same account that posts
+	// the trigger comment. The marker-based self-filter makes this work.
 	mux.HandleFunc("/user", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"login": "aizu-bot", "type": "Bot"})
+		json.NewEncoder(w).Encode(map[string]string{"login": "alice", "type": "User"})
 	})
 
 	mux.HandleFunc("/repos/o/r/issues/comments", func(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +106,7 @@ func TestPipeline(t *testing.T) {
 		Trigger:      "@aizu",
 		Repos:        []string{"o/r"},
 		PollInterval: 200 * time.Millisecond,
-		BotUsername:  "aizu-bot",
+		BotUsername:  "alice",
 	}
 
 	gh := github.NewWithBaseURL("test-token", srv.URL)
@@ -120,8 +122,9 @@ func TestPipeline(t *testing.T) {
 		if reply == "" {
 			t.Fatal("got empty reply from worker")
 		}
-		if reply != "agent output" {
-			t.Errorf("reply = %q, want %q", reply, "agent output")
+		want := "agent output\n\n" + github.ReplyMarker
+		if reply != want {
+			t.Errorf("reply = %q, want %q", reply, want)
 		}
 		t.Logf("pipeline produced reply: %s", reply)
 	case <-ctx.Done():

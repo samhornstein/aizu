@@ -46,12 +46,26 @@ func TestShouldTriggerMissingKeyword(t *testing.T) {
 	}
 }
 
-func TestShouldTriggerIgnoresBotComment(t *testing.T) {
-	p := newTestPoller(&config.Config{Trigger: "@aizu", BotUsername: "aizu-bot"})
+func TestShouldTriggerIgnoresMarkedReply(t *testing.T) {
+	p := newTestPoller(&config.Config{Trigger: "@aizu"})
 
-	c := github.Comment{Body: "@aizu done.", User: github.User{Login: "aizu-bot"}}
+	c := github.Comment{
+		Body: "@aizu done.\n\n" + github.ReplyMarker,
+		User: github.User{Login: "aizu-bot"},
+	}
 	if p.shouldTrigger("owner/repo", c) {
-		t.Error("shouldTrigger() = true, want false for bot's own comment")
+		t.Error("shouldTrigger() = true, want false for a marker-stamped reply")
+	}
+}
+
+func TestShouldTriggerSameAccountComment(t *testing.T) {
+	// Single-account mode: the token's login equals the triggering user's.
+	// An unmarked trigger comment from that account must still fire.
+	p := newTestPoller(&config.Config{Trigger: "@aizu", BotUsername: "alice"})
+
+	c := github.Comment{Body: "@aizu fix this", User: github.User{Login: "alice"}}
+	if !p.shouldTrigger("owner/repo", c) {
+		t.Error("shouldTrigger() = false, want true when the user triggers with their own token's account")
 	}
 }
 
@@ -279,6 +293,71 @@ func TestActiveSkipKeepsMarker(t *testing.T) {
 	p.pollOnce(ctx) // comment 43 again: marker must suppress it
 	if n := queueLen(t, q); n != 0 {
 		t.Errorf("after completion: queue len = %d, want 0 (skipped trigger must not fire later)", n)
+	}
+}
+
+// TestSingleAccountModeEndToEnd is the headline case for single-account mode:
+// the poller and worker share one identity. Poll 1 returns a trigger comment
+// authored by the token's own account — it must enqueue. Poll 2 returns Aizu's
+// marker-stamped reply from the same account — it must not.
+func TestSingleAccountModeEndToEnd(t *testing.T) {
+	var polls int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/issues/comments", func(w http.ResponseWriter, r *http.Request) {
+		comment := map[string]any{
+			"id":        int64(42),
+			"body":      "@aizu fix this",
+			"user":      map[string]string{"login": "alice"},
+			"issue_url": "https://api.github.com/repos/o/r/issues/1",
+		}
+		if atomic.AddInt32(&polls, 1) > 1 {
+			comment["id"] = int64(43)
+			comment["body"] = "Done, opened a PR.\n\n" + github.ReplyMarker
+		}
+		writeJSON(t, w, []map[string]any{comment})
+	})
+	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, []any{})
+	})
+
+	// BotUsername equals the commenter's login, as it does with a personal PAT.
+	cfg := &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, BotUsername: "alice"}
+	p, q := newLivePoller(t, cfg, mux)
+	ctx := context.Background()
+
+	p.pollOnce(ctx)
+	if n := queueLen(t, q); n != 1 {
+		t.Fatalf("after first poll: queue len = %d, want 1 (own-account trigger must run)", n)
+	}
+	popAndComplete(t, q)
+
+	p.pollOnce(ctx)
+	if n := queueLen(t, q); n != 0 {
+		t.Errorf("after second poll: queue len = %d, want 0 (marker-stamped reply must not trigger)", n)
+	}
+}
+
+// TestIssueBodyWithMarkerDoesNotTrigger: an issue whose body carries the
+// reply marker (written by Aizu itself) must be skipped by pollIssues.
+func TestIssueBodyWithMarkerDoesNotTrigger(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/issues/comments", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, []any{})
+	})
+	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, []map[string]any{{
+			"number":     9,
+			"title":      "Follow-up",
+			"body":       "@aizu created this\n\n" + github.ReplyMarker,
+			"user":       map[string]string{"login": "alice"},
+			"updated_at": "2026-07-10T10:00:00Z",
+		}})
+	})
+
+	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}}, mux)
+	p.pollOnce(context.Background())
+	if n := queueLen(t, q); n != 0 {
+		t.Errorf("queue len = %d, want 0 (marked issue body must not trigger)", n)
 	}
 }
 

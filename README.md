@@ -16,15 +16,9 @@ Get Aizu running and trigger your first agent.
 - [Docker](https://docs.docker.com/get-docker/)
 - [llama.cpp](https://github.com/ggml-org/llama.cpp#quick-start) — `brew install llama.cpp` on Mac
 
-### 1. Set up a GitHub bot account
+### 1. Create a GitHub token
 
-Aizu needs its own GitHub identity so it can post replies without conflicting with your personal account.
-
-Create a new account at [github.com/join](https://github.com/join) using `yourname+aizu@gmail.com` as the email and `yourname-aizu` as the username — GitHub treats the `+` address as separate but it lands in your existing inbox. GitHub also supports multiple logged-in accounts, so you can switch between them without signing out.
-
-Then from the bot account, generate a [classic token](https://github.com/settings/tokens) with the `repo` scope (fine-grained tokens can't access repos the account doesn't own).
-
-> **Private repos:** Add the bot account as a collaborator first: **Settings → Collaborators → Add people**. Then log in as the bot account and accept the collaboration invite — the token won't have access until the invite is accepted.
+Generate a [classic token](https://github.com/settings/tokens) with the `repo` scope on **your own account** (fine-grained tokens can't access repos the account doesn't own). Aizu marks its own replies so it never re-triggers on them, even when it posts as you.
 
 ### 2. Clone and configure
 
@@ -32,11 +26,11 @@ Then from the bot account, generate a [classic token](https://github.com/setting
 git clone https://github.com/samhornstein/aizu.git && cd aizu
 ```
 
-Create a `.env` with your bot token and the repositories to watch (see
+Create a `.env` with your token and the repositories to watch (see
 `.env.example` for all options):
 
 ```env
-GITHUB_TOKEN=ghp_YOUR_BOT_TOKEN_HERE
+GITHUB_TOKEN=ghp_YOUR_TOKEN_HERE
 AIZU_REPOS=owner/repo
 ```
 
@@ -73,7 +67,7 @@ docker compose logs -f aizu
 
 ### 5. Trigger your first agent
 
-From your **personal** account, comment on any issue in a watched repo:
+Comment on any issue in a watched repo:
 
 ```
 aizu hello
@@ -82,6 +76,12 @@ aizu hello
 Within one polling interval (15 seconds by default) Aizu reacts with 👀, runs the agent, and posts the result as a reply.
 
 > **Note:** With a small local model the reply may be incoherent or raw JSON — that's expected. The goal here is just to confirm the pipeline works end-to-end. For real tasks, use a larger model or an API key.
+
+## Give Aizu its own identity (optional)
+
+By default Aizu posts replies as whoever owns the token. If you'd rather have replies attributed to a separate account, create one at [github.com/join](https://github.com/join) using `yourname+aizu@gmail.com` as the email and `yourname-aizu` as the username — GitHub treats the `+` address as separate but it lands in your existing inbox. Generate the classic token from that account instead.
+
+> **Private repos:** Add the bot account as a collaborator first: **Settings → Collaborators → Add people**. Then log in as the bot account and accept the collaboration invite — the token won't have access until the invite is accepted.
 
 ## Docs
 

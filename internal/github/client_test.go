@@ -156,13 +156,31 @@ func TestCreateComment(t *testing.T) {
 		}
 		var payload map[string]string
 		json.NewDecoder(r.Body).Decode(&payload)
-		if payload["body"] != "hello" {
-			t.Errorf("body = %q, want hello", payload["body"])
+		if payload["body"] != "hello\n\n"+ReplyMarker {
+			t.Errorf("body = %q, want %q", payload["body"], "hello\n\n"+ReplyMarker)
 		}
 		return jsonResp(r, 201, `{}`), nil
 	})
 
 	if err := c.CreateComment(context.Background(), "o/r", 1, "hello"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateCommentStampsMarkerAfterTrailingNewlines(t *testing.T) {
+	c := fakeClient(func(r *http.Request) (*http.Response, error) {
+		var payload map[string]string
+		json.NewDecoder(r.Body).Decode(&payload)
+		if !strings.HasSuffix(payload["body"], "\n\n"+ReplyMarker) {
+			t.Errorf("body = %q, want marker suffix exactly once after trimmed newlines", payload["body"])
+		}
+		if strings.Count(payload["body"], ReplyMarker) != 1 {
+			t.Errorf("body = %q, want exactly one marker", payload["body"])
+		}
+		return jsonResp(r, 201, `{}`), nil
+	})
+
+	if err := c.CreateComment(context.Background(), "o/r", 1, "done\n\n\n"); err != nil {
 		t.Fatal(err)
 	}
 }

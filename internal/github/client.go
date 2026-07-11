@@ -18,6 +18,12 @@ import (
 
 const apiBase = "https://api.github.com"
 
+// ReplyMarker is appended (invisibly) to every comment Aizu posts, so the
+// poller can recognize and skip Aizu's own output regardless of which
+// account posted it. This is what makes running Aizu with a personal
+// token possible.
+const ReplyMarker = "<!-- aizu-reply -->"
+
 // Client talks to the GitHub REST API with a fixed bearer token.
 type Client struct {
 	token   string
@@ -154,8 +160,10 @@ func (c *Client) AddReaction(ctx context.Context, repoFull string, commentID int
 	return c.post(ctx, u, body, nil)
 }
 
-// CreateComment posts a comment on an issue or PR.
+// CreateComment posts a comment on an issue or PR. Every body is stamped with
+// ReplyMarker here, in the client, so no call site can forget it.
 func (c *Client) CreateComment(ctx context.Context, repoFull string, number int, body string) error {
+	body = strings.TrimRight(body, "\n") + "\n\n" + ReplyMarker
 	u := fmt.Sprintf("%s/repos/%s/issues/%d/comments", c.base(), repoFull, number)
 	return c.post(ctx, u, map[string]string{"body": body}, nil)
 }

@@ -177,6 +177,20 @@ func (c *Client) GetPullRequest(ctx context.Context, repoFull string, number int
 	return &pr, nil
 }
 
+// Permission returns the named user's permission level on the repo:
+// "admin", "write", "read", or "none". Requires push access on the token
+// for private repos; on error the caller should fail closed.
+func (c *Client) Permission(ctx context.Context, repoFull, username string) (string, error) {
+	var out struct {
+		Permission string `json:"permission"`
+	}
+	u := fmt.Sprintf("%s/repos/%s/collaborators/%s/permission", c.base(), repoFull, url.PathEscape(username))
+	if err := c.get(ctx, u, &out); err != nil {
+		return "", err
+	}
+	return out.Permission, nil
+}
+
 // AddReaction adds a reaction (e.g. "eyes") to an issue comment.
 func (c *Client) AddReaction(ctx context.Context, repoFull string, commentID int64, content string) error {
 	body := map[string]string{"content": content}

@@ -21,10 +21,10 @@ func newTestPoller(cfg *config.Config) *Poller {
 }
 
 func TestShouldTriggerKeyword(t *testing.T) {
-	p := newTestPoller(&config.Config{Trigger: "@aizu"})
+	p := newTestPoller(&config.Config{Trigger: "@aizu", AllowAll: true})
 
 	c := github.Comment{Body: "@aizu fix this", User: github.User{Login: "alice"}}
-	if !p.shouldTrigger("owner/repo", c) {
+	if !p.shouldTrigger(context.Background(), "owner/repo", c) {
 		t.Error("shouldTrigger() = false, want true when comment begins with the keyword")
 	}
 }
@@ -33,7 +33,7 @@ func TestShouldTriggerKeywordMidComment(t *testing.T) {
 	p := newTestPoller(&config.Config{Trigger: "@aizu"})
 
 	c := github.Comment{Body: "hey @aizu fix this", User: github.User{Login: "alice"}}
-	if p.shouldTrigger("owner/repo", c) {
+	if p.shouldTrigger(context.Background(), "owner/repo", c) {
 		t.Error("shouldTrigger() = true, want false when the keyword is not at the start")
 	}
 }
@@ -42,7 +42,7 @@ func TestShouldTriggerMissingKeyword(t *testing.T) {
 	p := newTestPoller(&config.Config{Trigger: "@aizu"})
 
 	c := github.Comment{Body: "just a regular comment", User: github.User{Login: "alice"}}
-	if p.shouldTrigger("owner/repo", c) {
+	if p.shouldTrigger(context.Background(), "owner/repo", c) {
 		t.Error("shouldTrigger() = true, want false when keyword absent")
 	}
 }
@@ -54,7 +54,7 @@ func TestShouldTriggerIgnoresMarkedReply(t *testing.T) {
 		Body: "@aizu done.\n\n" + github.ReplyMarker,
 		User: github.User{Login: "aizu-bot"},
 	}
-	if p.shouldTrigger("owner/repo", c) {
+	if p.shouldTrigger(context.Background(), "owner/repo", c) {
 		t.Error("shouldTrigger() = true, want false for a marker-stamped reply")
 	}
 }
@@ -62,10 +62,10 @@ func TestShouldTriggerIgnoresMarkedReply(t *testing.T) {
 func TestShouldTriggerSameAccountComment(t *testing.T) {
 	// Single-account mode: the token's login equals the triggering user's.
 	// An unmarked trigger comment from that account must still fire.
-	p := newTestPoller(&config.Config{Trigger: "@aizu", BotUsername: "alice"})
+	p := newTestPoller(&config.Config{Trigger: "@aizu", BotUsername: "alice", AllowAll: true})
 
 	c := github.Comment{Body: "@aizu fix this", User: github.User{Login: "alice"}}
-	if !p.shouldTrigger("owner/repo", c) {
+	if !p.shouldTrigger(context.Background(), "owner/repo", c) {
 		t.Error("shouldTrigger() = false, want true when the user triggers with their own token's account")
 	}
 }
@@ -74,22 +74,22 @@ func TestShouldTriggerAllowlist(t *testing.T) {
 	p := newTestPoller(&config.Config{Trigger: "@aizu", Users: []string{"alice", "bob"}})
 
 	allowed := github.Comment{Body: "@aizu go", User: github.User{Login: "alice"}}
-	if !p.shouldTrigger("owner/repo", allowed) {
+	if !p.shouldTrigger(context.Background(), "owner/repo", allowed) {
 		t.Error("shouldTrigger() = false, want true for allowlisted user")
 	}
 
 	blocked := github.Comment{Body: "@aizu go", User: github.User{Login: "eve"}}
-	if p.shouldTrigger("owner/repo", blocked) {
+	if p.shouldTrigger(context.Background(), "owner/repo", blocked) {
 		t.Error("shouldTrigger() = true, want false for non-allowlisted user")
 	}
 }
 
-func TestShouldTriggerEmptyAllowlistPermitsAll(t *testing.T) {
-	p := newTestPoller(&config.Config{Trigger: "@aizu", Users: nil})
+func TestShouldTriggerAllowAll(t *testing.T) {
+	p := newTestPoller(&config.Config{Trigger: "@aizu", AllowAll: true})
 
 	c := github.Comment{Body: "@aizu help", User: github.User{Login: "anyone"}}
-	if !p.shouldTrigger("owner/repo", c) {
-		t.Error("shouldTrigger() = false, want true when allowlist is empty (permit all)")
+	if !p.shouldTrigger(context.Background(), "owner/repo", c) {
+		t.Error("shouldTrigger() = false, want true with AIZU_ALLOW_ALL")
 	}
 }
 
@@ -180,7 +180,7 @@ func TestIssueBodyTriggersExactlyOnce(t *testing.T) {
 		}})
 	})
 
-	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}}, mux)
+	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, AllowAll: true}, mux)
 	ctx := context.Background()
 
 	p.pollOnce(ctx)
@@ -211,7 +211,7 @@ func TestEditedCommentDoesNotRetrigger(t *testing.T) {
 		writeJSON(t, w, []any{})
 	})
 
-	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}}, mux)
+	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, AllowAll: true}, mux)
 	ctx := context.Background()
 
 	p.pollOnce(ctx)
@@ -247,7 +247,7 @@ func TestDistinctCommentsBothTrigger(t *testing.T) {
 		writeJSON(t, w, []any{})
 	})
 
-	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}}, mux)
+	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, AllowAll: true}, mux)
 	ctx := context.Background()
 
 	p.pollOnce(ctx)
@@ -280,7 +280,7 @@ func TestActiveSkipKeepsMarker(t *testing.T) {
 		writeJSON(t, w, []any{})
 	})
 
-	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}}, mux)
+	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, AllowAll: true}, mux)
 	ctx := context.Background()
 
 	p.pollOnce(ctx) // comment 42 enqueued; issue 1 now active
@@ -322,7 +322,7 @@ func TestSingleAccountModeEndToEnd(t *testing.T) {
 	})
 
 	// BotUsername equals the commenter's login, as it does with a personal PAT.
-	cfg := &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, BotUsername: "alice"}
+	cfg := &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, BotUsername: "alice", AllowAll: true}
 	p, q := newLivePoller(t, cfg, mux)
 	ctx := context.Background()
 
@@ -355,10 +355,152 @@ func TestIssueBodyWithMarkerDoesNotTrigger(t *testing.T) {
 		}})
 	})
 
-	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}}, mux)
+	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, AllowAll: true}, mux)
 	p.pollOnce(context.Background())
 	if n := queueLen(t, q); n != 0 {
 		t.Errorf("queue len = %d, want 0 (marked issue body must not trigger)", n)
+	}
+}
+
+// permGateMux returns a fake GitHub server serving one trigger comment from
+// author, with a /permission endpoint that answers perm (or status, if not
+// 200) and counts its hits.
+func permGateMux(t *testing.T, author, perm string, status int, hits *int32) *http.ServeMux {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/issues/comments", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, []map[string]any{{
+			"id":        int64(42),
+			"body":      "@aizu go",
+			"user":      map[string]string{"login": author},
+			"issue_url": "https://api.github.com/repos/o/r/issues/1",
+		}})
+	})
+	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, []any{})
+	})
+	mux.HandleFunc("/repos/o/r/collaborators/", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(hits, 1)
+		if status != http.StatusOK {
+			w.WriteHeader(status)
+			return
+		}
+		writeJSON(t, w, map[string]string{"permission": perm})
+	})
+	return mux
+}
+
+// TestPermissionGate: without an allowlist, only write/admin authors may
+// trigger; API errors deny (fail closed).
+func TestPermissionGate(t *testing.T) {
+	cases := []struct {
+		name   string
+		perm   string
+		status int
+		want   int64
+	}{
+		{"write triggers", "write", http.StatusOK, 1},
+		{"admin triggers", "admin", http.StatusOK, 1},
+		{"read denied", "read", http.StatusOK, 0},
+		{"none denied", "none", http.StatusOK, 0},
+		{"404 fails closed", "", http.StatusNotFound, 0},
+		{"500 fails closed", "", http.StatusInternalServerError, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var hits int32
+			mux := permGateMux(t, "alice", tc.perm, tc.status, &hits)
+			p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}}, mux)
+
+			p.pollOnce(context.Background())
+			if n := queueLen(t, q); n != tc.want {
+				t.Errorf("queue len = %d, want %d", n, tc.want)
+			}
+			if hits == 0 {
+				t.Error("permission endpoint was never consulted")
+			}
+		})
+	}
+}
+
+// TestAllowlistSkipsPermissionAPI: an explicit AIZU_USERS list decides alone —
+// members trigger with no permission call, non-members are denied even with
+// write access.
+func TestAllowlistSkipsPermissionAPI(t *testing.T) {
+	var hits int32
+	mux := permGateMux(t, "alice", "write", http.StatusOK, &hits)
+	cfg := &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, Users: []string{"alice"}}
+	p, q := newLivePoller(t, cfg, mux)
+
+	p.pollOnce(context.Background())
+	if n := queueLen(t, q); n != 1 {
+		t.Fatalf("queue len = %d, want 1 (allowlisted author)", n)
+	}
+	if hits != 0 {
+		t.Errorf("permission endpoint hit %d times, want 0 with an allowlist", hits)
+	}
+
+	var hits2 int32
+	mux2 := permGateMux(t, "bob", "write", http.StatusOK, &hits2)
+	p2, q2 := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, Users: []string{"alice"}}, mux2)
+	p2.pollOnce(context.Background())
+	if n := queueLen(t, q2); n != 0 {
+		t.Errorf("queue len = %d, want 0 (bob not allowlisted, even with write)", n)
+	}
+}
+
+// TestAllowAllPermitsReadOnly: the escape hatch admits authors without write.
+func TestAllowAllPermitsReadOnly(t *testing.T) {
+	var hits int32
+	mux := permGateMux(t, "alice", "read", http.StatusOK, &hits)
+	cfg := &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, AllowAll: true}
+	p, q := newLivePoller(t, cfg, mux)
+
+	p.pollOnce(context.Background())
+	if n := queueLen(t, q); n != 1 {
+		t.Errorf("queue len = %d, want 1 with AIZU_ALLOW_ALL", n)
+	}
+	if hits != 0 {
+		t.Errorf("permission endpoint hit %d times, want 0 with AIZU_ALLOW_ALL", hits)
+	}
+}
+
+// TestPermissionCached: repeat comments by one author cost one API call.
+func TestPermissionCached(t *testing.T) {
+	var hits int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/issues/comments", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, []map[string]any{
+			{
+				"id":        int64(42),
+				"body":      "@aizu one",
+				"user":      map[string]string{"login": "alice"},
+				"issue_url": "https://api.github.com/repos/o/r/issues/1",
+			},
+			{
+				"id":        int64(43),
+				"body":      "@aizu two",
+				"user":      map[string]string{"login": "alice"},
+				"issue_url": "https://api.github.com/repos/o/r/issues/2",
+			},
+		})
+	})
+	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, []any{})
+	})
+	mux.HandleFunc("/repos/o/r/collaborators/", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		writeJSON(t, w, map[string]string{"permission": "write"})
+	})
+
+	p, q := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}}, mux)
+	p.pollOnce(context.Background())
+
+	if n := queueLen(t, q); n != 2 {
+		t.Fatalf("queue len = %d, want 2", n)
+	}
+	if hits != 1 {
+		t.Errorf("permission endpoint hit %d times, want 1 (cached)", hits)
 	}
 }
 
@@ -379,7 +521,7 @@ func TestPollErrorThrottled(t *testing.T) {
 		writeJSON(t, w, []any{})
 	})
 
-	p, _ := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}}, mux)
+	p, _ := newLivePoller(t, &config.Config{Trigger: "@aizu", Repos: []string{"o/r"}, AllowAll: true}, mux)
 	ctx := context.Background()
 
 	p.pollOnce(ctx)
@@ -412,17 +554,17 @@ func TestShouldTriggerIssueBody(t *testing.T) {
 	// The shouldTrigger function works on comments. For issue body triggers,
 	// the poller uses inline checks in pollIssues instead.
 	// Verify that the keyword check logic is consistent.
-	p := newTestPoller(&config.Config{Trigger: "@aizu"})
+	p := newTestPoller(&config.Config{Trigger: "@aizu", AllowAll: true})
 
 	// A comment with the keyword should trigger.
 	c := github.Comment{Body: "@aizu fix this", User: github.User{Login: "alice"}}
-	if !p.shouldTrigger("owner/repo", c) {
+	if !p.shouldTrigger(context.Background(), "owner/repo", c) {
 		t.Error("shouldTrigger() = false, want true for matching keyword")
 	}
 
 	// A comment without the keyword should not trigger.
 	c2 := github.Comment{Body: "just a regular comment", User: github.User{Login: "alice"}}
-	if p.shouldTrigger("owner/repo", c2) {
+	if p.shouldTrigger(context.Background(), "owner/repo", c2) {
 		t.Error("shouldTrigger() = true, want false when keyword absent")
 	}
 }

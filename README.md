@@ -81,6 +81,8 @@ aizu hello
 
 Within one polling interval (15 seconds by default) Aizu reacts with 👀, runs the agent, and posts the result as a reply.
 
+> **Who can trigger?** By default only users with write access to the repo — safe even on public repos. `AIZU_USERS` allowlists specific logins instead; `AIZU_ALLOW_ALL=true` disables the gate (never on a public repo).
+
 > **Note:** With a small local model the reply may be incoherent or raw JSON — that's expected. The goal here is just to confirm the pipeline works end-to-end. For real tasks, use a larger model or an API key.
 
 ## Give Aizu its own identity (optional)

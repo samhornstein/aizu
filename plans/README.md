@@ -41,7 +41,6 @@ its README index row in the same PR."*
 | Plan | Category | Severity / Value | Branch |
 |------|----------|------------------|--------|
 | [feat-prebuilt-images.md](feat-prebuilt-images.md) | Quickstart | High — install via one compose file, no clone/build | `feat/prebuilt-images` |
-| [security-collaborator-gate.md](security-collaborator-gate.md) | Security | **High** — today anyone who can comment can trigger the agent | `fix/collaborator-gate` |
 | [feat-sandbox-github-api.md](feat-sandbox-github-api.md) | Agent capability | High — makes AIZU.md's progress updates actually possible | `feat/sandbox-github-api` |
 | [security-secrets-hygiene.md](security-secrets-hygiene.md) | Security | High — secrets visible in host `ps`; token could leak into public comments | `fix/secrets-hygiene` |
 | [feat-feedback-polish.md](feat-feedback-polish.md) | UX | Medium — status reactions, `aizu help`, progress comment, rate limit | `feat/feedback-polish` |

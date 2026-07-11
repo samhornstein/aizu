@@ -19,13 +19,25 @@ weight: 1
 
 ## Restrict triggers
 
-By default any comment with the trigger keyword fires the agent. For public
-repos or shared orgs, restrict to trusted users:
+A trigger runs an agent on **your** machine, so who may trigger matters. By
+default only users with **write or admin permission** on the repo can trigger;
+everyone else is silently ignored (one log line explains the deny).
 
-```toml
-[trigger]
-users = ["alice", "bob"]
+Two overrides in `.env`:
+
+```env
+# Exactly these logins may trigger — replaces the write-access check
+# (useful to admit a trusted outside contributor):
+AIZU_USERS=alice,bob
+
+# DANGER: let anyone who can comment trigger the agent. Never use this
+# on a public repo — any GitHub account could run code on your machine
+# and spend your tokens/compute.
+AIZU_ALLOW_ALL=true
 ```
+
+Permission lookups are cached for 10 minutes, so revoking someone's access
+takes effect within that window.
 
 ## Container isolation
 

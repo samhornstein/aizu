@@ -215,6 +215,33 @@ func TestCreateCommentStampsMarkerAfterTrailingNewlines(t *testing.T) {
 	}
 }
 
+func TestPermission(t *testing.T) {
+	for _, perm := range []string{"admin", "write", "read", "none"} {
+		c := fakeClient(func(r *http.Request) (*http.Response, error) {
+			if r.URL.Path != "/repos/o/r/collaborators/alice/permission" {
+				t.Errorf("path = %q, want /repos/o/r/collaborators/alice/permission", r.URL.Path)
+			}
+			return jsonResp(r, 200, fmt.Sprintf(`{"permission":%q}`, perm)), nil
+		})
+		got, err := c.Permission(context.Background(), "o/r", "alice")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != perm {
+			t.Errorf("Permission() = %q, want %q", got, perm)
+		}
+	}
+}
+
+func TestPermissionNotFound(t *testing.T) {
+	c := fakeClient(func(r *http.Request) (*http.Response, error) {
+		return jsonResp(r, 404, `{"message":"Not Found"}`), nil
+	})
+	if _, err := c.Permission(context.Background(), "o/r", "ghost"); err == nil {
+		t.Fatal("expected error for 404, got nil")
+	}
+}
+
 func TestPullRequestHeadRepoDecoding(t *testing.T) {
 	cases := []struct {
 		name string

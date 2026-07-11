@@ -12,15 +12,11 @@ Get Aizu running and trigger your first agent.
 - [Docker](https://docs.docker.com/get-docker/)
 - [llama.cpp](https://github.com/ggml-org/llama.cpp#quick-start) — `brew install llama.cpp` on Mac
 
-## 1. Set up a GitHub bot account
+## 1. Create a GitHub token
 
-Aizu needs its own GitHub identity so it can post replies without conflicting with your personal account.
+Generate a [classic token](https://github.com/settings/tokens) with the `repo` scope on **your own account** (fine-grained tokens can't access repos the account doesn't own). Aizu marks its own replies so it never re-triggers on them, even when it posts as you.
 
-Create a new account at [github.com/join](https://github.com/join) using `yourname+aizu@gmail.com` as the email and `yourname-aizu` as the username — GitHub treats the `+` address as separate but it lands in your existing inbox. GitHub also supports multiple logged-in accounts, so you can switch between them without signing out.
-
-Then from the bot account, generate a [classic token](https://github.com/settings/tokens) with the `repo` scope (fine-grained tokens can't access repos the account doesn't own).
-
-> **Private repos:** Add the bot account as a collaborator first: **Settings → Collaborators → Add people**. Then log in as the bot account and accept the collaboration invite — the token won't have access until the invite is accepted.
+> **Want replies from a separate identity?** Create a dedicated account at [github.com/join](https://github.com/join) using `yourname+aizu@gmail.com` as the email and `yourname-aizu` as the username — GitHub treats the `+` address as separate but it lands in your existing inbox. Generate the token from that account instead. For private repos, add the bot account as a collaborator (**Settings → Collaborators → Add people**) and accept the invite from the bot account before the token will work.
 
 ## 2. Clone and configure
 
@@ -28,11 +24,11 @@ Then from the bot account, generate a [classic token](https://github.com/setting
 git clone https://github.com/samhornstein/aizu.git && cd aizu
 ```
 
-Create a `.env` with your bot token and the repositories to watch (see
+Create a `.env` with your token and the repositories to watch (see
 `.env.example` for all options):
 
 ```env
-GITHUB_TOKEN=ghp_YOUR_BOT_TOKEN_HERE
+GITHUB_TOKEN=ghp_YOUR_TOKEN_HERE
 AIZU_REPOS=owner/repo
 ```
 
@@ -69,7 +65,7 @@ docker compose logs -f aizu
 
 ## 5. Trigger your first agent
 
-From your **personal** account, comment on any issue in a watched repo:
+Comment on any issue in a watched repo:
 
 ```
 aizu hello
@@ -97,7 +93,6 @@ docker compose restart aizu
 ```
 
 **Aizu isn't picking up comments:**
-- Make sure the comment is from your *personal* account, not the bot account — Aizu ignores its own token's account.
 - Check that your message begins with the trigger keyword (`AIZU_TRIGGER`, default `aizu`).
 - Check that `AIZU_REPOS` matches the repo exactly (`owner/repo`).
 - The poller runs every 15 seconds; wait one interval then check the logs.

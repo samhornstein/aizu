@@ -54,9 +54,10 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Resolve the token's own login so we never react to our own comments.
+	// Resolve the token's login for logging. Self-comment filtering does not
+	// depend on it: Aizu's replies carry a content marker the poller skips.
 	if user, err := gh.AuthenticatedUser(ctx); err != nil {
-		slog.Warn("Could not resolve authenticated user; self-comment filtering disabled", "error", err)
+		slog.Warn("Could not resolve authenticated user; check GITHUB_TOKEN", "error", err)
 	} else {
 		cfg.BotUsername = user.Login
 		slog.Info("Authenticated", "login", user.Login, "type", user.Type)

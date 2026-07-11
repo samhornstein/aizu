@@ -121,8 +121,8 @@ func (p *Poller) pollIssues(ctx context.Context, repo string) error {
 	}
 
 	for _, issue := range issues {
-		if p.cfg.BotUsername != "" && issue.User.Login == p.cfg.BotUsername {
-			continue // never react to issues created by our own account
+		if strings.Contains(issue.Body, github.ReplyMarker) {
+			continue // body written by Aizu itself
 		}
 		if !p.triggered(issue.Body) {
 			continue
@@ -193,10 +193,12 @@ func (p *Poller) triggered(text string) bool {
 	return strings.HasPrefix(strings.TrimSpace(text), p.cfg.Trigger)
 }
 
-// shouldTrigger applies the self/author/keyword filters.
+// shouldTrigger applies the self/keyword/allowlist filters. Aizu's own
+// replies are recognized by the ReplyMarker they carry, not by author, so a
+// personal token (whose login equals the triggering user's) works.
 func (p *Poller) shouldTrigger(repo string, c github.Comment) bool {
-	if p.cfg.BotUsername != "" && c.User.Login == p.cfg.BotUsername {
-		return false // never react to our own comments
+	if strings.Contains(c.Body, github.ReplyMarker) {
+		return false // one of our own replies
 	}
 	if !p.triggered(c.Body) {
 		return false

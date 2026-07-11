@@ -7,8 +7,10 @@ weight: 1
 
 ## Token management
 
-- **Use a dedicated bot account.** Never run Aizu with your personal GitHub
-  token.
+- **Consider a dedicated bot account.** A personal token works, but a
+  separate account limits the blast radius if the token leaks and keeps
+  agent activity attributed to a distinct identity — recommended for
+  anything beyond personal projects.
 - **Use a classic PAT with only the `repo` scope.** Avoid broader scopes like
   `admin:org` or `write:packages`.
 - **Rotate tokens regularly.** Aizu reads `GITHUB_TOKEN` at startup, so

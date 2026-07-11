@@ -18,7 +18,7 @@ Get Aizu running and trigger your first agent.
 
 ### 1. Create a GitHub token
 
-Generate a [classic token](https://github.com/settings/tokens) with the `repo` scope on **your own account** (fine-grained tokens can't access repos the account doesn't own). Aizu marks its own replies so it never re-triggers on them, even when it posts as you.
+Generate a [classic token](https://github.com/settings/tokens) with the `repo` scope. A fine-grained token also works for repos your account owns (Contents, Issues, and Pull requests read/write) — but not for repos you only collaborate on, so classic is the simpler default. Aizu marks its own replies so it never re-triggers on them, even when it posts as you.
 
 ### 2. Download and configure
 

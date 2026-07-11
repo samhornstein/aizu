@@ -10,6 +10,35 @@ read that first.**
 
 PR titles must follow Conventional Commits (enforced by `.github/workflows/pr-title.yml`).
 
+## Executing a plan
+
+Plans are executed **sequentially, one at a time, in ROADMAP order** — not as
+parallel branches. Later plans assume earlier plans' changes are already in
+`main` (they patch each other's final shapes), so parallel branches produce
+semantic conflicts that merge cleanly and break silently. Do not fan out.
+
+Per plan:
+
+1. Start from up-to-date `main` (the previous plan already merged). Create
+   the branch named in the plan's header.
+2. Implement exactly what the plan says. Its **Out of scope** section is a
+   hard boundary — if the implementation seems to require exceeding it, stop
+   and ask rather than improvise. Follow the philosophy guardrails at the
+   top of [ROADMAP.md](ROADMAP.md).
+3. Run the plan's **Verification** section. Do not open a PR until it passes.
+4. In the same PR: delete the plan file and remove its row from the index
+   below, so this directory always lists exactly the remaining work.
+5. Open the PR with the title from the plan's header; let CI pass; a human
+   reviews and merges before the next plan begins.
+
+Suggested session prompt: *"Read plans/ROADMAP.md, then implement
+plans/&lt;file&gt;.md. Follow it exactly, respect its Out of scope section, run
+its Verification commands before opening a PR, and delete the plan file +
+its README index row in the same PR."*
+
+The only pair safe to run in parallel is `bugfix-stale-running-set.md` and
+`bugfix-timeout-detection.md` (disjoint packages); it is rarely worth it.
+
 ## Index
 
 | Plan | Category | Severity / Value | Branch |

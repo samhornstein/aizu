@@ -96,6 +96,25 @@ func (q *Queue) RecoverStale(ctx context.Context) {
 	}
 }
 
+// AllowRun increments the hourly run counter for repo and reports whether
+// this run is within limit, along with the counter value (so the caller can
+// reply exactly once when the limit trips). The window is a fixed UTC hour
+// bucket. limit <= 0 disables the check; Redis errors fail open —
+// availability over strictness here, unlike authorization.
+func (q *Queue) AllowRun(ctx context.Context, repo string, limit int) (bool, int64) {
+	if limit <= 0 {
+		return true, 0
+	}
+	key := fmt.Sprintf("aizu:rate:%s:%s", repo, time.Now().UTC().Format("2006010215"))
+	n, err := q.rdb.Incr(ctx, key).Result()
+	if err != nil {
+		slog.Warn("Could not check rate limit; allowing run", "repo", repo, "error", err)
+		return true, 0
+	}
+	q.rdb.Expire(ctx, key, 2*time.Hour)
+	return n <= int64(limit), n
+}
+
 // Enqueue atomically checks whether the issue/PR already has an active task and,
 // if not, creates and queues a new one. Returns (nil, nil) if skipped because
 // a task is already running or queued for that issue/PR.

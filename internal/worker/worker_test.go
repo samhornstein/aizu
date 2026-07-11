@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -295,6 +298,201 @@ func TestProcessRedactsSecrets(t *testing.T) {
 				t.Errorf("posted comment should carry the redaction marker; got: %s", posted)
 			}
 		})
+	}
+}
+
+// feedbackServer is a fake GitHub server recording reactions, comment posts,
+// and comment edits for process()-level tests.
+type feedbackServer struct {
+	mu            sync.Mutex
+	reactions     []string
+	posts         []string
+	patches       map[int64]string
+	failFirstPost bool // 500 the first comment POST (the placeholder)
+	postsSeen     int
+	nextID        int64
+}
+
+func newFeedbackServer(t *testing.T) (*feedbackServer, *httptest.Server) {
+	t.Helper()
+	fs := &feedbackServer{patches: map[int64]string{}, nextID: 100}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/issues/9", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"number": 9, "title": "T"})
+	})
+	mux.HandleFunc("/repos/o/r/issues/comments/777/reactions", func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		fs.mu.Lock()
+		fs.reactions = append(fs.reactions, payload["content"])
+		fs.mu.Unlock()
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte("{}"))
+	})
+	mux.HandleFunc("/repos/o/r/issues/9/comments", func(w http.ResponseWriter, r *http.Request) {
+		fs.mu.Lock()
+		fs.postsSeen++
+		firstAndFailing := fs.failFirstPost && fs.postsSeen == 1
+		fs.mu.Unlock()
+		if firstAndFailing {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		var payload map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		fs.mu.Lock()
+		fs.posts = append(fs.posts, payload["body"])
+		fs.nextID++
+		id := fs.nextID
+		fs.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": id})
+	})
+	mux.HandleFunc("/repos/o/r/issues/comments/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("comment edit method = %q, want PATCH", r.Method)
+		}
+		var id int64
+		_, _ = fmt.Sscanf(r.URL.Path, "/repos/o/r/issues/comments/%d", &id)
+		var payload map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		fs.mu.Lock()
+		fs.patches[id] = payload["body"]
+		fs.mu.Unlock()
+		_, _ = w.Write([]byte("{}"))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return fs, srv
+}
+
+func newFeedbackWorker(t *testing.T, srv *httptest.Server, exec *mockExecutor, cfg *config.Config) *Worker {
+	t.Helper()
+	mr := miniredis.RunT(t)
+	return New(queue.New("redis://"+mr.Addr()), exec, github.NewWithBaseURL("t", srv.URL), template.NewLoader("sys"), cfg)
+}
+
+func commentTask(id string) *queue.Task {
+	return &queue.Task{ID: id, Repo: "o/r", Number: 9, CommentID: 777, Author: "alice", Body: "@aizu do it", Retries: 1}
+}
+
+func TestProcessPlaceholderAndReactions(t *testing.T) {
+	fs, srv := newFeedbackServer(t)
+	exec := &mockExecutor{fileErr: errors.New("no file"), engineOut: "all done"}
+	w := newFeedbackWorker(t, srv, exec, &config.Config{Trigger: "@aizu"})
+
+	w.process(context.Background(), commentTask("t1"))
+
+	if want := []string{"eyes", "rocket"}; !slices.Equal(fs.reactions, want) {
+		t.Errorf("reactions = %v, want %v", fs.reactions, want)
+	}
+	if len(fs.posts) != 1 || !strings.Contains(fs.posts[0], "working") {
+		t.Fatalf("posts = %v, want one placeholder containing 'working'", fs.posts)
+	}
+	if got := fs.patches[101]; !strings.Contains(got, "all done") {
+		t.Errorf("placeholder was not edited into the result; patches = %v", fs.patches)
+	}
+}
+
+func TestProcessFailureReactionAndEdit(t *testing.T) {
+	fs, srv := newFeedbackServer(t)
+	exec := &mockExecutor{fileErr: errors.New("no file"), engineExit: 1, engineOut: "boom"}
+	w := newFeedbackWorker(t, srv, exec, &config.Config{Trigger: "@aizu"})
+
+	w.process(context.Background(), commentTask("t1"))
+
+	if want := []string{"eyes", "confused"}; !slices.Equal(fs.reactions, want) {
+		t.Errorf("reactions = %v, want %v", fs.reactions, want)
+	}
+	if got := fs.patches[101]; !strings.Contains(got, "failed") {
+		t.Errorf("placeholder should carry the failure text; patches = %v", fs.patches)
+	}
+}
+
+func TestProcessPlaceholderPostFailureStillReplies(t *testing.T) {
+	fs, srv := newFeedbackServer(t)
+	exec := &mockExecutor{fileErr: errors.New("no file"), engineOut: "result"}
+	w := newFeedbackWorker(t, srv, exec, &config.Config{Trigger: "@aizu"})
+
+	fs.failFirstPost = true
+	w.process(context.Background(), commentTask("t1"))
+
+	if len(fs.posts) != 1 || !strings.Contains(fs.posts[0], "result") {
+		t.Errorf("result must arrive as a new comment when the placeholder failed; posts = %v", fs.posts)
+	}
+	if len(fs.patches) != 0 {
+		t.Errorf("nothing should be patched without a placeholder; patches = %v", fs.patches)
+	}
+}
+
+func TestHelpRequest(t *testing.T) {
+	for _, body := range []string{"@aizu help", "@aizu", "  @aizu   HELP  "} {
+		t.Run(body, func(t *testing.T) {
+			fs, srv := newFeedbackServer(t)
+			exec := &mockExecutor{fileErr: errors.New("no file")}
+			w := newFeedbackWorker(t, srv, exec, &config.Config{Trigger: "@aizu"})
+
+			task := commentTask("t1")
+			task.Body = body
+			w.process(context.Background(), task)
+
+			if len(fs.posts) != 1 || !strings.Contains(fs.posts[0], "implement") {
+				t.Fatalf("posts = %v, want one help reply", fs.posts)
+			}
+			if exec.gotPrompt != "" {
+				t.Error("help must not run the engine")
+			}
+		})
+	}
+}
+
+func TestHelpNotTriggeredByPrefix(t *testing.T) {
+	fs, srv := newFeedbackServer(t)
+	exec := &mockExecutor{fileErr: errors.New("no file"), engineOut: "done"}
+	w := newFeedbackWorker(t, srv, exec, &config.Config{Trigger: "@aizu"})
+
+	task := commentTask("t1")
+	task.Body = "@aizu helpme do X"
+	w.process(context.Background(), task)
+
+	if exec.gotPrompt == "" {
+		t.Error("'helpme' is a real request and must reach the engine")
+	}
+	if len(fs.posts) == 0 || strings.Contains(fs.posts[0], "implement") {
+		t.Errorf("must not post the help text; posts = %v", fs.posts)
+	}
+}
+
+func TestRateLimit(t *testing.T) {
+	fs, srv := newFeedbackServer(t)
+	exec := &mockExecutor{fileErr: errors.New("no file"), engineOut: "ok"}
+	w := newFeedbackWorker(t, srv, exec, &config.Config{Trigger: "@aizu", MaxRunsPerHour: 2})
+	ctx := context.Background()
+
+	for i := 1; i <= 2; i++ {
+		w.process(ctx, commentTask(fmt.Sprintf("t%d", i)))
+	}
+	if exec.gotPrompt == "" {
+		t.Fatal("runs within the limit must reach the engine")
+	}
+	postsBefore := len(fs.posts)
+
+	// Third task trips the limit: one limit reply, no engine run.
+	exec.gotPrompt = ""
+	w.process(ctx, commentTask("t3"))
+	if exec.gotPrompt != "" {
+		t.Error("rate-limited task must not run the engine")
+	}
+	if len(fs.posts) != postsBefore+1 || !strings.Contains(fs.posts[len(fs.posts)-1], "rate limit") {
+		t.Fatalf("want exactly one limit reply; posts = %v", fs.posts)
+	}
+
+	// Fourth is dropped silently.
+	w.process(ctx, commentTask("t4"))
+	if len(fs.posts) != postsBefore+1 {
+		t.Errorf("fourth task must not post; posts = %v", fs.posts)
 	}
 }
 

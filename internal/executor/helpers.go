@@ -51,8 +51,10 @@ func runWithStdin(cmd, stdin string, timeout time.Duration) (string, error) {
 
 // resolveEngineCommand picks the engine command for this run — the local
 // variant when a local model server is configured and the preset has one —
-// and substitutes {prompt_file} and {model}. discover maps a base URL to the
-// server's model ID and is only called when the command needs it.
+// and substitutes {prompt_file}, {model} and {base_url}. discover maps a base
+// URL to the server's model ID and is only called when the command needs it.
+// {base_url} is the configured server rewritten for use inside the sandbox,
+// for engines that take the endpoint via env or flag (e.g. aider).
 func resolveEngineCommand(cfg *config.Config, discover func(string) (string, error)) (string, error) {
 	command := cfg.EngineCommand
 	if cfg.OpenAIBaseURL != "" && cfg.EngineLocalCommand != "" {
@@ -65,6 +67,9 @@ func resolveEngineCommand(cfg *config.Config, discover func(string) (string, err
 			return "", fmt.Errorf("discover local model: %w", err)
 		}
 		command = strings.ReplaceAll(command, "{model}", shellQuote(id))
+	}
+	if strings.Contains(command, "{base_url}") {
+		command = strings.ReplaceAll(command, "{base_url}", shellQuote(sandboxURL(cfg.OpenAIBaseURL)))
 	}
 	return command, nil
 }

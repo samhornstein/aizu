@@ -99,6 +99,22 @@ func TestResolveEngineCommand(t *testing.T) {
 			t.Error("want error when {model} cannot be resolved")
 		}
 	})
+
+	t.Run("base_url substituted and rewritten for the sandbox", func(t *testing.T) {
+		cfg := &config.Config{
+			OpenAIBaseURL:      "http://localhost:8080/v1",
+			EngineCommand:      `a`,
+			EngineLocalCommand: `OPENAI_API_BASE={base_url} aider --model openai/{model} --message "$(cat {prompt_file})"`,
+		}
+		got, err := resolveEngineCommand(cfg, discover)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := `OPENAI_API_BASE='http://host.docker.internal:8080/v1' aider --model openai/'qwen' --message "$(cat ` + promptFile + `)"`
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
 }
 
 func TestSandboxURL(t *testing.T) {

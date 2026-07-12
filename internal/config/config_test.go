@@ -124,6 +124,36 @@ func TestEnginePresetClaude(t *testing.T) {
 	}
 }
 
+func TestEnginePresetAider(t *testing.T) {
+	t.Setenv("AIZU_ENGINE", "aider")
+	cfg := Load()
+	if cfg.ContainerImage != "ghcr.io/samhornstein/aizu-agent-aider:latest" {
+		t.Errorf("ContainerImage = %q, want the aider ghcr image", cfg.ContainerImage)
+	}
+	if !strings.Contains(cfg.EngineCommand, "aider --yes-always") {
+		t.Errorf("EngineCommand = %q, want a non-interactive aider command", cfg.EngineCommand)
+	}
+	for _, ph := range []string{"{model}", "{base_url}"} {
+		if !strings.Contains(cfg.EngineLocalCommand, ph) {
+			t.Errorf("EngineLocalCommand = %q, want it to carry %s", cfg.EngineLocalCommand, ph)
+		}
+	}
+}
+
+func TestEnginePresetOpencode(t *testing.T) {
+	t.Setenv("AIZU_ENGINE", "opencode")
+	cfg := Load()
+	if cfg.ContainerImage != "ghcr.io/samhornstein/aizu-agent-opencode:latest" {
+		t.Errorf("ContainerImage = %q, want the opencode ghcr image", cfg.ContainerImage)
+	}
+	if !strings.Contains(cfg.EngineCommand, "opencode run") {
+		t.Errorf("EngineCommand = %q, want the opencode run command", cfg.EngineCommand)
+	}
+	if cfg.EngineLocalCommand != "" {
+		t.Errorf("EngineLocalCommand = %q, want empty (opencode has no local variant)", cfg.EngineLocalCommand)
+	}
+}
+
 func TestEngineUnknownFallsBackToPi(t *testing.T) {
 	t.Setenv("AIZU_ENGINE", "notreal")
 	cfg := Load()

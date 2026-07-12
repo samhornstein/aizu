@@ -58,6 +58,16 @@ services:
     image: aizu-agent:claude
     profiles: ["agent"]
 
+  agent-aider:
+    build: ./templates/aider
+    image: aizu-agent:aider
+    profiles: ["agent"]
+
+  agent-opencode:
+    build: ./templates/opencode
+    image: aizu-agent:opencode
+    profiles: ["agent"]
+
 volumes:
   redis-data:
 

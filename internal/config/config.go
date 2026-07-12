@@ -28,10 +28,10 @@ type Config struct {
 	Signature   bool   // append the "Generated with Aizu" line to every reply
 
 	// Agent
-	Engine             string // preset name: pi | claude (see enginePresets)
+	Engine             string // preset name: pi | claude | aider | opencode (see enginePresets)
 	ContainerImage     string // image the agent runs in
 	EngineCommand      string // command run inside the container; {prompt_file} is substituted
-	EngineLocalCommand string // variant used when a local model server is configured; {model} is substituted. Empty = always use EngineCommand.
+	EngineLocalCommand string // variant used when a local model server is configured; {model} and {base_url} are substituted. Empty = always use EngineCommand.
 	Timeout            int    // agent run timeout, seconds
 	MaxRunsPerHour     int    // per-repo hourly cap on agent runs; 0 disables
 	Concurrency        int    // number of agent tasks run in parallel
@@ -48,7 +48,8 @@ type Config struct {
 // enginePreset bundles the sandbox image and run commands for a known agent.
 // LocalCommand is used instead of Command when a local model server is
 // configured (OPENAI_BASE_URL set or auto-detected); it may contain {model},
-// substituted at run time with the server's discovered model ID. Engines
+// substituted at run time with the server's discovered model ID, and
+// {base_url}, the server URL rewritten for use inside the sandbox. Engines
 // without a LocalCommand run Command regardless.
 type enginePreset struct {
 	Image        string
@@ -65,6 +66,20 @@ var enginePresets = map[string]enginePreset{
 	"claude": {
 		Image:   "ghcr.io/samhornstein/aizu-agent-claude:latest",
 		Command: `claude --dangerously-skip-permissions -p "$(cat {prompt_file})"`,
+	},
+	// aider reads OpenAI-compatible endpoints from OPENAI_API_BASE and
+	// requires some OPENAI_API_KEY value even for keyless local servers,
+	// hence the inline env in the local variant.
+	"aider": {
+		Image:        "ghcr.io/samhornstein/aizu-agent-aider:latest",
+		Command:      `aider --yes-always --no-check-update --message "$(cat {prompt_file})"`,
+		LocalCommand: `OPENAI_API_BASE={base_url} OPENAI_API_KEY="${OPENAI_API_KEY:-local}" aider --yes-always --no-check-update --model openai/{model} --message "$(cat {prompt_file})"`,
+	},
+	// opencode picks its provider from API keys in the environment; local
+	// OpenAI-compatible servers need an opencode.json, so no local variant.
+	"opencode": {
+		Image:   "ghcr.io/samhornstein/aizu-agent-opencode:latest",
+		Command: `opencode run "$(cat {prompt_file})"`,
 	},
 }
 

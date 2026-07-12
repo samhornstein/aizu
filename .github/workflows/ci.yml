@@ -65,16 +65,20 @@ jobs:
         env:
           REDIS_URL: redis://localhost:6379/1
 
-  # Both Dockerfiles must stay buildable; nothing else exercises them until
+  # Every Dockerfile must stay buildable; nothing else exercises them until
   # release time.
   docker:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
       - name: Build aizu image
         run: docker build -t aizu:ci .
 
-      - name: Build agent image
-        run: docker build -t aizu-agent:ci templates/pi
+      - name: Build agent images
+        run: |
+          for engine in templates/*/; do
+            engine=$(basename "$engine")
+            docker build -t "aizu-agent:ci-$engine" "templates/$engine"
+          done

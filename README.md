@@ -92,6 +92,8 @@ AIZU_ENGINE=claude
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+Also available: `AIZU_ENGINE=aider` ([aider](https://aider.chat) — works with local models and API keys, like pi) and `AIZU_ENGINE=opencode` ([opencode](https://opencode.ai) — uses your API key, or falls back to its free hosted model).
+
 The right sandbox image is pulled automatically. For any other agent, set `CONTAINER_IMAGE` and `ENGINE_COMMAND` directly (they override the preset).
 
 ## Give Aizu its own identity (optional)

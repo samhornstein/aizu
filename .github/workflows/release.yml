@@ -148,3 +148,25 @@ jobs:
           tags: |
             ghcr.io/samhornstein/aizu-agent-claude:latest
             ghcr.io/samhornstein/aizu-agent-claude:${{ steps.ver.outputs.next }}
+
+      - name: Publish agent image (aider)
+        if: ${{ !inputs.dry_run }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ./templates/aider
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/samhornstein/aizu-agent-aider:latest
+            ghcr.io/samhornstein/aizu-agent-aider:${{ steps.ver.outputs.next }}
+
+      - name: Publish agent image (opencode)
+        if: ${{ !inputs.dry_run }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ./templates/opencode
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/samhornstein/aizu-agent-opencode:latest
+            ghcr.io/samhornstein/aizu-agent-opencode:${{ steps.ver.outputs.next }}

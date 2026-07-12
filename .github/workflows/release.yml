@@ -8,12 +8,19 @@ name: Release
 # Each release also publishes multi-arch images to ghcr.io — the default
 # no-clone install (deploy/docker-compose.yml) pulls :latest. Building from
 # source (the root docker-compose.yml) remains the contributor path.
+#
+# Check "dry run" to preview the computed version and changelog (in the run
+# summary) without tagging, releasing, or pushing anything.
 on:
   workflow_dispatch:
     inputs:
       version:
         description: "Version to release, e.g. v1.2.3 (blank = auto-compute from commits)"
         required: false
+      dry_run:
+        description: "Dry run: print the version and changelog, publish nothing"
+        type: boolean
+        default: false
 
 permissions:
   contents: write # push the tag + create the release
@@ -57,7 +64,21 @@ jobs:
           echo "next=$next" >> "$GITHUB_OUTPUT"
           echo "Releasing $next"
 
+      # The tag doesn't exist yet on a dry run, so preview the changelog from
+      # the unreleased commits instead of --latest.
+      - name: Dry run summary
+        if: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          git cliff --unreleased --tag "${{ steps.ver.outputs.next }}" --strip header -o CHANGES.md
+          {
+            echo "## Dry run: would release ${{ steps.ver.outputs.next }}"
+            echo
+            cat CHANGES.md
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Tag the release
+        if: ${{ !inputs.dry_run }}
         run: |
           set -euo pipefail
           if git rev-parse -q --verify "refs/tags/${{ steps.ver.outputs.next }}" >/dev/null; then
@@ -70,9 +91,11 @@ jobs:
           fi
 
       - name: Generate changelog
+        if: ${{ !inputs.dry_run }}
         run: git cliff --latest --strip header -o CHANGES.md
 
       - name: Create GitHub release
+        if: ${{ !inputs.dry_run }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -83,14 +106,18 @@ jobs:
       # Publish images from this same checkout — the tag above points at
       # HEAD, so source and tag always match.
       - uses: docker/setup-qemu-action@v3
+        if: ${{ !inputs.dry_run }}
       - uses: docker/setup-buildx-action@v3
+        if: ${{ !inputs.dry_run }}
       - uses: docker/login-action@v4
+        if: ${{ !inputs.dry_run }}
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish aizu image
+        if: ${{ !inputs.dry_run }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -101,6 +128,7 @@ jobs:
             ghcr.io/samhornstein/aizu:${{ steps.ver.outputs.next }}
 
       - name: Publish agent image (pi)
+        if: ${{ !inputs.dry_run }}
         uses: docker/build-push-action@v6
         with:
           context: ./templates/pi
@@ -111,6 +139,7 @@ jobs:
             ghcr.io/samhornstein/aizu-agent-pi:${{ steps.ver.outputs.next }}
 
       - name: Publish agent image (claude)
+        if: ${{ !inputs.dry_run }}
         uses: docker/build-push-action@v6
         with:
           context: ./templates/claude

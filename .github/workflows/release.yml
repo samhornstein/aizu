@@ -105,7 +105,7 @@ jobs:
 
       # Publish images from this same checkout — the tag above points at
       # HEAD, so source and tag always match.
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
         if: ${{ !inputs.dry_run }}
       - uses: docker/setup-buildx-action@v3
         if: ${{ !inputs.dry_run }}
